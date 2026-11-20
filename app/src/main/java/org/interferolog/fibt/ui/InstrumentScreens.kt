@@ -61,6 +61,7 @@ import org.interferolog.fibt.domain.runwayMonths
 import org.interferolog.fibt.domain.runwayZone
 import org.interferolog.fibt.domain.splitCoupon
 import org.interferolog.fibt.domain.weeklyTranche
+import org.interferolog.fibt.domain.weeklyTrancheRemainder
 import java.io.File
 import java.time.LocalDate
 import java.time.ZoneId
@@ -240,8 +241,17 @@ fun FamilyScreen(viewModel: JournalViewModel) {
     LaunchedEffect(left) { if (left > 0) { delay(1000); left -= 1 } }
     val now = System.currentTimeMillis()
     val quarantine = ui.quarantines.firstOrNull { it.kind == "H24" && it.endsAt > now }
+    val anyMoney = listOf(income1, income2, foundation, fund, personal1, personal2).any { it.isNotBlank() }
     ScreenColumn {
         BodyText("Обмен между двумя телефонами в эту версию не входит. Запись остаётся на этом устройстве.")
+        QuietCard(JournalCanon.week(6).lead)
+        SectionTitle("Поле боя или приборная панель")
+        JournalCanon.battlefield.forEach { row ->
+            BodyText(row.parameter)
+            MetaText("Поле боя: ${row.battle}")
+            MetaText("Приборная панель: ${row.panel}")
+        }
+        MetaText("Общая Опора и обязательства не урезаются ни в одном споре. Общий Инструмент сверх порога ждёт 24 часа. Целевой фонд меняется только через спокойный разговор. Личные доли — без отчётов.")
         Field("Доход 1, ₽", income1, { income1 = it }, number = true)
         Field("Доход 2, ₽", income2, { income2 = it }, number = true)
         Field("Фундамент Ф, ₽", foundation, { foundation = it }, number = true)
@@ -251,8 +261,12 @@ fun FamilyScreen(viewModel: JournalViewModel) {
         Field("Порог общей траты, ₽", threshold, { threshold = it }, number = true)
         val f = parseRubles(foundation) ?: 0
         val remainder = familyRemainder(parseRubles(income1) ?: 0, parseRubles(income2) ?: 0, f)
-        HeroNumber(formatRubles(remainder), "Свободный остаток С")
-        BodyText("Проверка: Ф + Ц + Л₁ + Л₂ = ${formatRubles(f + (parseRubles(fund) ?: 0) + (parseRubles(personal1) ?: 0) + (parseRubles(personal2) ?: 0))}")
+        if (anyMoney) {
+            HeroNumber(formatRubles(remainder), "Свободный остаток С")
+            BodyText("Проверка: Ф + Ц + Л₁ + Л₂ = ${formatRubles(f + (parseRubles(fund) ?: 0) + (parseRubles(personal1) ?: 0) + (parseRubles(personal2) ?: 0))}")
+        } else {
+            MetaText("Свободный остаток С появится, когда будут вписаны свои суммы. Пример из главы в поля не подставлен.")
+        }
         CommitButton("Сохранить контуры", onClick = {
             viewModel.saveFamily(
                 FamilyPlanEntity(
@@ -297,7 +311,7 @@ fun RestScreen(viewModel: JournalViewModel) {
     var obligations by remember { mutableStateOf("") }
     var balance by remember { mutableStateOf("") }
     var profile by remember { mutableStateOf(ui.rest?.profile ?: "HIRE") }
-    var cut by remember { mutableStateOf(ui.rest?.firstCutPercent?.toString() ?: "5") }
+    var cut by remember { mutableStateOf("") }
     var strategy by remember { mutableStateOf(ui.rest?.strategy ?: "AVALANCHE") }
     var income by remember { mutableStateOf("") }
     var withdrawal by remember { mutableStateOf("") }
@@ -312,6 +326,7 @@ fun RestScreen(viewModel: JournalViewModel) {
         Field("Обязательства, ₽", obligations, { obligations = it }, number = true)
         Field("Масса покоя B, ₽", balance, { balance = it }, number = true)
         Field("Первое сечение, %", cut, { cut = it }, number = true)
+        MetaText("Первое сечение: 1–5% при долгах; 10–20% без долгов. Поле пустое, пока не вписана своя доля.")
         ChoiceGroup(
             options = listOf("HIRE" to "Найм", "FREELANCE" to "Фриланс", "BUSINESS" to "Бизнес"),
             selected = profile,
@@ -319,9 +334,10 @@ fun RestScreen(viewModel: JournalViewModel) {
         )
         val minimum = carryingMinimum(parseRubles(support) ?: 0, parseRubles(tool) ?: 0, parseRubles(obligations) ?: 0)
         val months = runwayMonths(parseRubles(balance) ?: 0, minimum)
-        val zone = months?.let { runwayZone(it, profileMonths(profile)) }
+        val target = profileMonths(profile)
+        val zone = months?.let { runwayZone(it, target) }
         HeroNumber(months?.let { "%.1f".format(it) } ?: "—", "Запас хода, месяцев. Emin ${formatRubles(minimum)}")
-        if (zone != null) QuietCard(runwayLabel(zone), runwayTone(zone))
+        if (zone != null) QuietCard(runwayLabel(zone, target), runwayTone(zone))
         BodyText("Цель профиля: ${profileMonths(profile)} месяцев.")
         CommitButton("Записать массу покоя", onClick = {
             viewModel.saveRest(
@@ -332,7 +348,7 @@ fun RestScreen(viewModel: JournalViewModel) {
                     obligations = parseRubles(obligations) ?: 0,
                     balance = parseRubles(balance) ?: ui.rest?.balance ?: 0,
                     profile = profile,
-                    firstCutPercent = cut.toDoubleOrNull() ?: 5.0,
+                    firstCutPercent = cut.toDoubleOrNull() ?: 0.0,
                     accountOpened = true,
                     strategy = strategy,
                 ),
@@ -399,11 +415,14 @@ fun CrisisScreen(viewModel: JournalViewModel) {
         Field("Кольцо опоры", ring, { ring = it }, singleLine = false)
         Field("Три предложения рынку", offers, { offers = it }, singleLine = false)
         val emergencyValue = parseRubles(emergency) ?: 0
+        val profile = profileMonths(ui.rest?.profile ?: "HIRE")
         val runway = runwayMonths(parseRubles(accessible) ?: 0, emergencyValue)
-        val crisisZone = runway?.let { runwayZone(it, profileMonths(ui.rest?.profile ?: "HIRE")) }
+        val crisisZone = runway?.let { runwayZone(it, profile) }
         HeroNumber(runway?.let { "%.0f".format(it * 30) } ?: "—", "Аварийный запас хода, дней")
-        if (crisisZone != null) QuietCard(runwayLabel(crisisZone), runwayTone(crisisZone))
-        MetaText("Недельный транш: ${formatRubles(weeklyTranche(emergencyValue))}")
+        if (crisisZone != null) QuietCard(runwayLabel(crisisZone, profile), runwayTone(crisisZone))
+        val trancheRemainder = weeklyTrancheRemainder(emergencyValue)
+        val trancheNote = if (trancheRemainder == 0L) "" else " Остаток ${formatRubles(trancheRemainder)} остаётся в запасе."
+        MetaText("Недельный транш: ${formatRubles(weeklyTranche(emergencyValue))}.$trancheNote")
         CommitButton("Сохранить карту", onClick = {
             viewModel.saveCrisis(
                 CrisisMapEntity(
@@ -542,16 +561,18 @@ fun PassportScreen(viewModel: JournalViewModel) {
     val cycleId = ui.cycle?.id ?: return
     val fields = remember { mutableStateListOf("", "", "", "", "", "", "") }
     var balance by remember { mutableStateOf("") }
-    var payment by remember { mutableStateOf("10000") }
-    var rate by remember { mutableStateOf("10") }
-    var years by remember { mutableStateOf("20") }
-    var reinvest by remember { mutableStateOf("50") }
-    var support by remember { mutableStateOf("30") }
-    var crystal by remember { mutableStateOf("20") }
+    var payment by remember { mutableStateOf("") }
+    var rate by remember { mutableStateOf("") }
+    var years by remember { mutableStateOf("") }
+    var reinvest by remember { mutableStateOf("") }
+    var support by remember { mutableStateOf("") }
+    var crystal by remember { mutableStateOf("") }
     var drawdown by remember { mutableStateOf(false) }
     var coupon by remember { mutableStateOf("") }
     ScreenColumn {
-        BodyText("Цифры калькулятора — иллюстрация для расчёта, а не обещание рынка.")
+        QuietCard(org.interferolog.fibt.content.CALC_DISCLAIMER, CardTone.Tertiary)
+        QuietCard(JournalCanon.passportExample)
+        MetaText("Поля ниже пустые. Пример из главы в них не подставляется и прогнозом не является.")
         JournalCanon.passportFields.forEachIndexed { index, label ->
             Field(label, fields[index], { fields[index] = it }, singleLine = false)
         }
@@ -559,17 +580,33 @@ fun PassportScreen(viewModel: JournalViewModel) {
         Field("Взнос в месяц, ₽", payment, { payment = it }, number = true)
         Field("Доходность в год, %", rate, { rate = it }, number = true)
         Field("Лет", years, { years = it }, number = true)
-        val value = futureValue(parseRubles(payment) ?: 0, (rate.toDoubleOrNull() ?: 0.0) / 100.0, (years.toIntOrNull() ?: 0) * 12)
-        HeroNumber(formatRubles(value.toLong()), "Иллюстрация счёта к концу срока")
+        val paymentKop = parseRubles(payment)
+        val rateValue = rate.toDoubleOrNull()
+        val yearValue = years.toIntOrNull()
+        if (payment.isNotBlank() && rate.isNotBlank() && years.isNotBlank() &&
+            paymentKop != null && rateValue != null && yearValue != null && yearValue > 0
+        ) {
+            val value = futureValue(paymentKop, rateValue / 100.0, yearValue * 12)
+            HeroNumber(formatRubles(value.toLong()), "Иллюстрация счёта к концу срока по введённым полям")
+            BodyText(org.interferolog.fibt.content.CALC_DISCLAIMER)
+        } else {
+            MetaText("Впишите взнос, доходность и срок — тогда появится иллюстрация по вашим полям. Пока они пустые, крупной цифры нет.")
+        }
         val half = (parseRubles(balance) ?: 0) / 2
-        BodyText("Просадка 50% оставляет на счёте ${formatRubles(half)}. Опора, инструмент и сон при этом остаются отдельной массой покоя.")
+        if (balance.isNotBlank()) {
+            BodyText("Просадка 50% оставляет на счёте ${formatRubles(half)}. Опора, рабочие инструменты и сон при этом остаются отдельной Массой покоя.")
+        }
         SwitchRow("Переборка выдержала стресс-тест", drawdown) { drawdown = it }
         Field("Купонный приток, ₽", coupon, { coupon = it }, number = true)
+        MetaText("Доли реинвеста, Опоры и Кристалла журнал числами не задаёт. Впишите своё правило.")
         Field("Реинвест, %", reinvest, { reinvest = it }, number = true)
         Field("В Опору, %", support, { support = it }, number = true)
         Field("В Кристалл, %", crystal, { crystal = it }, number = true)
-        val split = splitCoupon(parseRubles(coupon) ?: 0, reinvest.toDoubleOrNull() ?: 0.0, support.toDoubleOrNull() ?: 0.0, crystal.toDoubleOrNull() ?: 0.0)
-        MetaText("Реинвест ${formatRubles(split.first)}, Опора ${formatRubles(split.second)}, Кристалл ${formatRubles(split.third)}.")
+        val couponKop = parseRubles(coupon)
+        if (coupon.isNotBlank() && couponKop != null && listOf(reinvest, support, crystal).all { it.isNotBlank() }) {
+            val split = splitCoupon(couponKop, reinvest.toDoubleOrNull() ?: 0.0, support.toDoubleOrNull() ?: 0.0, crystal.toDoubleOrNull() ?: 0.0)
+            MetaText("Реинвест ${formatRubles(split.first)}, Опора ${formatRubles(split.second)}, Кристалл ${formatRubles(split.third)}.")
+        }
         CommitButton("Сохранить паспорт", onClick = {
             viewModel.savePassport(
                 InvestmentPassportEntity(
@@ -583,11 +620,11 @@ fun PassportScreen(viewModel: JournalViewModel) {
                     hygiene = fields[6],
                     accountBalance = parseRubles(balance) ?: 0,
                     monthlyContribution = parseRubles(payment) ?: 0,
-                    annualRate = (rate.toDoubleOrNull() ?: 10.0) / 100.0,
-                    years = years.toIntOrNull() ?: 20,
-                    reinvestPercent = reinvest.toDoubleOrNull() ?: 50.0,
-                    supportPercent = support.toDoubleOrNull() ?: 30.0,
-                    crystalPercent = crystal.toDoubleOrNull() ?: 20.0,
+                    annualRate = (rate.toDoubleOrNull() ?: 0.0) / 100.0,
+                    years = years.toIntOrNull() ?: 0,
+                    reinvestPercent = reinvest.toDoubleOrNull() ?: 0.0,
+                    supportPercent = support.toDoubleOrNull() ?: 0.0,
+                    crystalPercent = crystal.toDoubleOrNull() ?: 0.0,
                     drawdownOk = drawdown,
                 ),
             )
@@ -601,9 +638,9 @@ fun ClusterScreen(viewModel: JournalViewModel) {
     val cycleId = ui.cycle?.id ?: return
     var name by remember { mutableStateOf("") }
     var role by remember { mutableStateOf("") }
-    var transparency by remember { mutableStateOf("7") }
-    var word by remember { mutableStateOf("7") }
-    var gain by remember { mutableStateOf("7") }
+    var transparency by remember { mutableStateOf("") }
+    var word by remember { mutableStateOf("") }
+    var gain by remember { mutableStateOf("") }
     var action by remember { mutableStateOf("") }
     ScreenColumn {
         ui.people.forEach { person ->
@@ -616,15 +653,17 @@ fun ClusterScreen(viewModel: JournalViewModel) {
         Field("Слово, 1–10", word, { word = it }, number = true)
         Field("Прирост связности, 1–10", gain, { gain = it }, number = true)
         Field("Одно действие", action, { action = it })
-        CommitButton("Добавить", onClick = {
+        val axesReady = listOf(transparency, word, gain).all { (it.toIntOrNull() ?: 0) in 1..10 }
+        if (!axesReady) MetaText("Оси 1–10 пустые, пока не вписаны свои оценки. Семёрка по умолчанию не ставится.")
+        CommitButton("Добавить", enabled = axesReady, onClick = {
             viewModel.savePerson(
                 ClusterPersonEntity(
                     cycleId = cycleId,
                     name = name.ifBlank { "Человек" },
                     role = role,
-                    transparency = transparency.toIntOrNull() ?: 1,
-                    word = word.toIntOrNull() ?: 1,
-                    coherence = gain.toIntOrNull() ?: 1,
+                    transparency = transparency.toIntOrNull() ?: return@CommitButton,
+                    word = word.toIntOrNull() ?: return@CommitButton,
+                    coherence = gain.toIntOrNull() ?: return@CommitButton,
                     action = action,
                 ),
             )

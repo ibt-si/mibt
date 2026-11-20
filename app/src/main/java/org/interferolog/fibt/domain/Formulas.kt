@@ -8,7 +8,7 @@ enum class FiZone { GREEN, YELLOW, RED }
 
 enum class Quadrant { CORE, GROWTH_POINT, HYGIENE, FRICTION }
 
-enum class RunwayZone { CRITICAL, VULNERABLE, HIRE, FREELANCE, BUSINESS }
+enum class RunwayZone { CRITICAL, VULNERABLE, BELOW_NORM, HIRE, FREELANCE, BUSINESS }
 
 enum class Circle { LOWER, MIDDLE, UPPER }
 
@@ -111,14 +111,32 @@ fun runwayMonths(balance: Long, minimum: Long): Double? {
 
 fun runwayZone(months: Double, profileMonths: Int): RunwayZone = when {
     months <= 0.0 -> RunwayZone.CRITICAL
-    months < 3.0 -> RunwayZone.VULNERABLE
-    profileMonths >= 24 && months >= 24.0 -> RunwayZone.BUSINESS
-    profileMonths >= 12 && months >= 12.0 -> RunwayZone.FREELANCE
-    months >= 6.0 -> RunwayZone.HIRE
-    else -> RunwayZone.VULNERABLE
+    months <= 3.0 -> RunwayZone.VULNERABLE
+    months >= profileMonths && profileMonths >= 24 -> RunwayZone.BUSINESS
+    months >= profileMonths && profileMonths >= 12 -> RunwayZone.FREELANCE
+    months >= profileMonths && profileMonths >= 6 -> RunwayZone.HIRE
+    else -> RunwayZone.BELOW_NORM
+}
+
+fun runwayZoneLabel(zone: RunwayZone, profileMonths: Int): String = when (zone) {
+    RunwayZone.CRITICAL -> "0 — критическая: любой сбой пробивает контур"
+    RunwayZone.VULNERABLE -> "До 3 месяцев — уязвимая: защищает от мелких аварий, не от потери дохода"
+    RunwayZone.HIRE -> "6 месяцев — рабочая норма для найма"
+    RunwayZone.FREELANCE -> "12 месяцев — норма для фриланса и независимых специалистов"
+    RunwayZone.BUSINESS -> "24 месяца — норма для владельца бизнеса"
+    RunwayZone.BELOW_NORM -> {
+        val norm = when {
+            profileMonths >= 24 -> "24 месяца — норма для владельца бизнеса"
+            profileMonths >= 12 -> "12 месяцев — норма для фриланса и независимых специалистов"
+            else -> "6 месяцев — рабочая норма для найма"
+        }
+        "Выше уязвимой зоны (до 3 месяцев), до нормы профиля ещё не дошло: $norm"
+    }
 }
 
 fun weeklyTranche(emergencyMinimum: Long): Long = emergencyMinimum / 4
+
+fun weeklyTrancheRemainder(emergencyMinimum: Long): Long = emergencyMinimum % 4
 
 fun echelonHours(weekHours: Double, share: Double): Double = weekHours * share
 
