@@ -1,5 +1,6 @@
 package org.interferolog.fibt.domain
 
+import org.interferolog.fibt.content.JournalCanon
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -107,6 +108,54 @@ class JournalRulesTest {
             listOf(10, 11, 12),
             planRoute(PhaseAnswers(true, true, mostlyV), true).weeks,
         )
+    }
+
+    @Test
+    fun runwayZonesFollowTheJournalBands() {
+        assertEquals(RunwayZone.CRITICAL, runwayZone(0.0, 6))
+        assertEquals(RunwayZone.VULNERABLE, runwayZone(0.5, 12))
+        assertEquals(RunwayZone.VULNERABLE, runwayZone(3.0, 6))
+        assertEquals(RunwayZone.BELOW_NORM, runwayZone(4.0, 6))
+        assertEquals(RunwayZone.HIRE, runwayZone(8.0, 6))
+        assertEquals(RunwayZone.BELOW_NORM, runwayZone(8.0, 12))
+        assertEquals(RunwayZone.FREELANCE, runwayZone(12.0, 12))
+        assertEquals(RunwayZone.BELOW_NORM, runwayZone(14.0, 24))
+        assertEquals(RunwayZone.BUSINESS, runwayZone(24.0, 24))
+        assertTrue(runwayZoneLabel(RunwayZone.BELOW_NORM, 12).contains("фриланса"))
+        assertFalse(runwayZoneLabel(RunwayZone.BELOW_NORM, 12).contains("найма"))
+        assertEquals(1L, weeklyTrancheRemainder(95_000_01))
+        assertEquals(23_750_00, weeklyTranche(95_000_01))
+    }
+
+    @Test
+    fun routeExplanationNamesTheCautiousTie() {
+        val tie = listOf(Letter.A, Letter.A, Letter.A, Letter.B, Letter.B, Letter.B, Letter.V)
+        val text = routeExplanation(PhaseAnswers(true, true, tie), fullCycleCompleted = true)
+        assertTrue(text.contains("более осторожный"))
+        assertTrue(text.contains("1, 2, 3, 4, 7"))
+        val emergency = routeExplanation(PhaseAnswers(false, true, List(7) { Letter.V }), true)
+        assertTrue(emergency.contains("Аварийный контур"))
+    }
+
+    @Test
+    fun canonTextsMatchTheJournalOnTheFlaggedLines() {
+        assertEquals("Семейный контур: два оператора", JournalCanon.week(6).title)
+        assertFalse(JournalCanon.weeks.joinToString { it.title }.contains("лодк"))
+        assertTrue(JournalCanon.items[0].a.contains("надо быстрее нажать кнопку и не думать"))
+        assertTrue(JournalCanon.items[2].a.contains("чтобы оправдать цифру"))
+        assertTrue(JournalCanon.items[2].v.contains("не с кем встать в один ряд"))
+        assertTrue(JournalCanon.items[4].b.contains("Планирование жёсткое"))
+        assertTrue(JournalCanon.items[5].prompt.contains("с другими людьми"))
+        assertTrue(JournalCanon.items[6].b.contains("надо закрыть ипотеку"))
+        assertTrue(JournalCanon.week(3).calculation.contains("× 100%"))
+        assertTrue(JournalCanon.week(5).calculation.contains("Реальная ставка часа S"))
+        assertFalse(JournalCanon.week(5).calculation.contains("Настоящая цена"))
+        assertTrue(JournalCanon.week(11).title.contains("потолка одиночки"))
+        assertTrue(JournalCanon.week(12).title.contains("то, что остаётся после нас"))
+        assertFalse(JournalCanon.scripts.any { it.body.contains("не приведён") })
+        assertTrue(JournalCanon.scripts.first { it.title == "Я пока не знаю" }.quoted)
+        assertTrue(JournalCanon.howToUse.first().startsWith("Журнал — рабочая тетрадь"))
+        assertEquals(7, JournalCanon.items.size)
     }
 
     @Test

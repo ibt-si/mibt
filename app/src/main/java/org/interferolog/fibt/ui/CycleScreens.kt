@@ -32,6 +32,8 @@ import androidx.navigation3.runtime.NavKey
 import kotlinx.coroutines.delay
 import org.interferolog.fibt.JournalViewModel
 import org.interferolog.fibt.activeAttempt
+import org.interferolog.fibt.content.CALC_DISCLAIMER
+import org.interferolog.fibt.currentWeekNumber
 import org.interferolog.fibt.content.JournalCanon
 import org.interferolog.fibt.content.POINT_C
 import org.interferolog.fibt.domain.Letter
@@ -59,11 +61,17 @@ import org.interferolog.fibt.domain.resistanceByRates
 import org.interferolog.fibt.domain.resistanceByShares
 import org.interferolog.fibt.domain.routeTitle
 import org.interferolog.fibt.domain.RouteKind
+import org.interferolog.fibt.domain.routeExplanation
 import org.interferolog.fibt.domain.runwayMonths
 import org.interferolog.fibt.domain.runwayZone
+import org.interferolog.fibt.domain.runwayZoneLabel
 import org.interferolog.fibt.domain.splitCoupon
 import org.interferolog.fibt.domain.weeklyTranche
+import org.interferolog.fibt.domain.weeklyTrancheRemainder
+import org.interferolog.fibt.domain.PhaseAnswers
 import org.interferolog.fibt.navigation.CapitalRoute
+import org.interferolog.fibt.navigation.GuideRoute
+import org.interferolog.fibt.navigation.MaintenanceRoute
 import org.interferolog.fibt.navigation.ClusterRoute
 import org.interferolog.fibt.navigation.CrisisRoute
 import org.interferolog.fibt.navigation.CrystalRoute
@@ -78,13 +86,28 @@ import org.interferolog.fibt.navigation.SourcesRoute
 import org.interferolog.fibt.navigation.WeekRoute
 import org.interferolog.fibt.navigation.WorkRoute
 import org.interferolog.fibt.navigation.open
+import org.interferolog.fibt.navigation.reveal
 
 @Composable
-fun IntakeScreen(viewModel: JournalViewModel) {
+fun GuideScreen(onStartTest: (() -> Unit)?) {
+    ScreenColumn {
+        JournalCanon.howToUse.forEach { BodyText(it) }
+        QuietCard(CALC_DISCLAIMER)
+        MetaText("В приложении тот же порядок: тест → маршрут → неделя → бланк → расчёт. К этому тексту можно вернуться из маршрута и из штатного обслуживания.")
+        if (onStartTest != null) {
+            CommitButton("Пройти входной тест", onClick = onStartTest)
+        }
+    }
+}
+
+@Composable
+fun IntakeScreen(viewModel: JournalViewModel, onRecorded: () -> Unit = {}) {
     val prior by viewModel.priorFullCycle.collectAsStateWithLifecycle()
-    var money by remember { mutableStateOf(true) }
-    var clear by remember { mutableStateOf(true) }
-    var answers by remember { mutableStateOf(List(7) { Letter.A }) }
+    val ui by viewModel.ui.collectAsStateWithLifecycle()
+    var money by remember { mutableStateOf<Boolean?>(null) }
+    var clear by remember { mutableStateOf<Boolean?>(null) }
+    var answers by remember { mutableStateOf(List<Letter?>(7) { null }) }
+    var submitted by remember { mutableStateOf(false) }
     val started = remember { System.currentTimeMillis() }
     var elapsed by remember { mutableLongStateOf(0L) }
     LaunchedEffect(Unit) {
@@ -93,18 +116,38 @@ fun IntakeScreen(viewModel: JournalViewModel) {
             delay(1000)
         }
     }
+    LaunchedEffect(submitted, ui.cycle?.id) {
+        if (submitted && ui.cycle != null) onRecorded()
+    }
+    val answered = (if (money != null) 1 else 0) + (if (clear != null) 1 else 0) + answers.count { it != null }
+    val complete = money != null && clear != null && answers.all { it != null }
     ScreenColumn {
-        Text("Ответы за пять минут, без попытки выбрать правильный вариант.", style = MaterialTheme.typography.bodyLarge)
-        Text("Прошло ${elapsed / 1000 / 60}:${"%02d".format((elapsed / 1000) % 60)}")
+        JournalCanon.testPreamble.forEach { BodyText(it) }
+        Text("Прошло ${elapsed / 1000 / 60}:${"%02d".format((elapsed / 1000) % 60)}. Отвечено $answered из 9.", style = MaterialTheme.typography.bodyLarge)
         LinearProgressIndicator(
             progress = { (elapsed / 300_000f).coerceAtMost(1f) },
             modifier = Modifier.fillMaxWidth(),
         )
         if (prior) BodyText("Полный цикл уже был пройден. Этот тест может открыть точечный ремонт.")
+        SectionTitle("Часть 1. Признаки маршрута")
+        MetaText("Выбор по факту, не по желанию. Пока ответ не отмечен, он никуда не засчитывается.")
         JournalCanon.partOne.forEachIndexed { index, prompt ->
             val value = if (index == 0) money else clear
-            SwitchRow(prompt, value) { if (index == 0) money = it else clear = it }
+            BodyText(prompt)
+            ChoiceChips(
+                options = listOf("YES" to "Да", "NO" to "Нет"),
+                selected = when (value) {
+                    true -> "YES"
+                    false -> "NO"
+                    null -> ""
+                },
+                onSelect = { picked ->
+                    val answer = picked == "YES"
+                    if (index == 0) money = answer else clear = answer
+                },
+            )
         }
+        SectionTitle("Часть 2. Пункты теста")
         JournalCanon.items.forEachIndexed { index, item ->
             SectionTitle("${item.number}. ${item.prompt}")
             Letter.entries.forEach { letter ->
@@ -121,7 +164,14 @@ fun IntakeScreen(viewModel: JournalViewModel) {
                 )
             }
         }
-        CommitButton("Записать маршрут") { viewModel.submitIntake(money, clear, answers, elapsed) }
+        if (!complete) MetaText("Кнопка откроется, когда отмечены оба признака части 1 и один вариант в каждом из семи пунктов.")
+        CommitButton("Записать маршрут", enabled = complete) {
+            val moneyAnswer = money ?: return@CommitButton
+            val clearAnswer = clear ?: return@CommitButton
+            val letters = answers.map { it ?: return@CommitButton }
+            submitted = true
+            viewModel.submitIntake(moneyAnswer, clearAnswer, letters, elapsed)
+        }
     }
 }
 
@@ -130,18 +180,29 @@ fun MapScreen(viewModel: JournalViewModel, backStack: NavBackStack<NavKey>) {
     val ui by viewModel.ui.collectAsStateWithLifecycle()
     val cycle = ui.cycle
     ScreenColumn {
+        TonalButton("Как пользоваться журналом") { backStack.add(GuideRoute) }
         if (cycle == null) {
-            BodyText("Маршрут появится после входного теста.")
+            BodyText("Маршрут появится после входного теста. Порядок: тест → маршрут → неделя → бланк → расчёт.")
             CommitButton("К тесту") { backStack.add(IntakeRoute) }
             return@ScreenColumn
         }
         val kind = runCatching { RouteKind.valueOf(cycle.routeKind) }.getOrNull()
         Text(kind?.let(::routeTitle) ?: cycle.routeKind, style = MaterialTheme.typography.headlineSmallEmphasized)
+        routeReason(ui)?.let { QuietCard(it) }
+        val current = ui.currentWeekNumber()
+        if (current == null) {
+            BodyText("Все недели этого маршрута пройдены. Дальше — штатное обслуживание: четыре ритма и пять маркеров.")
+            CommitButton("К штатному обслуживанию") { backStack.add(MaintenanceRoute) }
+        } else {
+            BodyText("Сейчас неделя $current. ${JournalCanon.week(current).title}. Внутри неё пять блоков по порядку: шаги, бланк, расчёт, готовность, калибровка.")
+            CommitButton("Открыть неделю $current") { backStack.add(WeekRoute(current)) }
+        }
         val done = ui.attempts.filter { it.status == "COMPLETED" }.map { it.weekNumber }.toSet()
         val scheme = MaterialTheme.colorScheme
         cycle.weekOrder.split(",").mapNotNull { it.toIntOrNull() }.forEach { number ->
             val title = JournalCanon.week(number).title
             val passed = number in done
+            val now = number == current
             ListItem(
                 onClick = { backStack.add(WeekRoute(number)) },
                 modifier = Modifier.fillMaxWidth(),
@@ -151,8 +212,23 @@ fun MapScreen(viewModel: JournalViewModel, backStack: NavBackStack<NavKey>) {
                         contentDescription = null,
                     )
                 },
-                supportingContent = { Text(if (passed) "Пройдена" else "Впереди") },
-                colors = if (passed) {
+                supportingContent = {
+                    Text(
+                        when {
+                            passed -> "Пройдена"
+                            now -> "Сейчас. Дальше — шаги, бланк и расчёт"
+                            else -> "Впереди"
+                        },
+                    )
+                },
+                colors = if (now) {
+                    ListItemDefaults.colors(
+                        containerColor = scheme.tertiaryContainer,
+                        contentColor = scheme.onTertiaryContainer,
+                        leadingContentColor = scheme.onTertiaryContainer,
+                        supportingContentColor = scheme.onTertiaryContainer,
+                    )
+                } else if (passed) {
                     ListItemDefaults.colors(
                         containerColor = scheme.primaryContainer,
                         contentColor = scheme.onPrimaryContainer,
@@ -204,7 +280,7 @@ fun WeekScreen(viewModel: JournalViewModel, number: Int, backStack: NavBackStack
             }
         }
         Box(Modifier.weight(1f).fillMaxWidth()) {
-            WeekTab(viewModel, number, backStack, canon, attempt, ui, tab, answers, scroll) { answers = it }
+            WeekTab(viewModel, number, backStack, canon, attempt, ui, tab, answers, scroll, { answers = it }) { tab = it }
         }
     }
 }
@@ -221,15 +297,27 @@ private fun WeekTab(
     answers: List<String>,
     scroll: androidx.compose.foundation.ScrollState,
     onAnswers: (List<String>) -> Unit,
+    onTab: (Int) -> Unit,
 ) {
     ScreenColumn(scrollState = scroll) {
+        MetaText("Неделя $number. ${pathHint(tab)}")
         when (tab) {
-            0 -> canon.steps.forEachIndexed { index, step -> BodyText("${index + 1}. $step") }
-            1 -> BlankLinks(viewModel, number, backStack)
+            0 -> {
+                if (ui.currentWeekNumber() == number) routeReason(ui)?.let { QuietCard(it) }
+                if (canon.lead.isNotBlank()) QuietCard(canon.lead)
+                canon.steps.forEachIndexed { index, step -> BodyText("${index + 1}. $step") }
+                TonalButton("Дальше: бланк") { onTab(1) }
+            }
+            1 -> {
+                BodyText("Рабочий бланк этой недели. Свои цифры, не пример из главы. После записи откройте расчёт.")
+                BlankLinks(viewModel, number, backStack)
+                TonalButton("Дальше: расчёт") { onTab(2) }
+            }
             2 -> {
                 BodyText(canon.calculation)
                 BodyText(liveCalculation(ui, number))
                 InstrumentButton(viewModel, number, backStack)
+                TonalButton("Дальше: готовность") { onTab(3) }
             }
             3 -> {
                 canon.readiness.forEach { BodyText("• $it") }
@@ -252,6 +340,7 @@ private fun WeekTab(
                         Text("Повторить неделю. Это штатный режим.")
                     }
                     CommitButton("Дальше по маршруту") { viewModel.advance(attempt) }
+                    TonalButton("К письменным ответам") { onTab(4) }
                 }
             }
             else -> {
@@ -275,37 +364,53 @@ private fun WeekTab(
 @Composable
 private fun BlankLinks(viewModel: JournalViewModel, number: Int, backStack: NavBackStack<NavKey>) {
     when (number) {
-        1 -> BodyText("Запись паузы — кнопка «Пауза». Она не проходит через минуту тишины.")
+        1 -> {
+            BodyText("Бланк 1. Дневник фазы. Запись паузы — кнопка «Пауза». Она не проходит через минуту тишины.")
+            TonalButton("Открыть паузу") { backStack.reveal(org.interferolog.fibt.navigation.PauseRoute) }
+        }
         2 -> {
-            BodyText("Точка C — одноимённая кнопка. Три напоминания ставятся здесь и остаются тихими.")
+            BodyText("Бланк 2а. Колодец или Точка C. Три напоминания ставятся здесь и остаются тихими.")
+            TonalButton("Открыть Точку C") { backStack.reveal(org.interferolog.fibt.navigation.PointCRoute) }
             ReminderEditor(viewModel)
         }
-        3 -> WeekLink("Холтер четырёх узлов") { backStack.open(HolterRoute) }
+        3 -> WeekLink("Бланк 2. Холтер четырёх узлов") { backStack.open(HolterRoute) }
         4 -> {
-            WeekLink("Индекс сопротивления") { backStack.open(SourcesRoute) }
+            WeekLink("Бланк 3. Индекс сопротивления") { backStack.open(SourcesRoute) }
             WeekLink("Тренажёр цены") { backStack.add(PriceRoute) }
         }
         5 -> {
-            WeekLink("Дела участка") { backStack.add(WorkRoute) }
+            WeekLink("Бланк 3н. Дела участка") { backStack.add(WorkRoute) }
             WeekLink("Тренажёр цены") { backStack.add(PriceRoute) }
         }
-        6 -> WeekLink("Два контура") { backStack.add(FamilyRoute) }
-        7 -> WeekLink("Масса покоя") { backStack.open(RestRoute) }
-        8 -> WeekLink("Карта кризиса") { backStack.open(CrisisRoute) }
-        9 -> WeekLink("Карта веера") { backStack.add(FanRoute) }
-        10 -> WeekLink("Инвестиционный паспорт") { backStack.open(CapitalRoute) }
-        11 -> WeekLink("Карта кластера") { backStack.add(ClusterRoute) }
-        12 -> WeekLink("Кристалл смысла") { backStack.add(CrystalRoute) }
+        6 -> WeekLink("Бланк 4. Два контура") { backStack.add(FamilyRoute) }
+        7 -> WeekLink("Бланк 5. Масса покоя") { backStack.open(RestRoute) }
+        8 -> WeekLink("Бланк 6. Карта кризиса") { backStack.open(CrisisRoute) }
+        9 -> WeekLink("Бланк 7. Карта веера") { backStack.add(FanRoute) }
+        10 -> WeekLink("Бланк 8. Инвестиционный паспорт") { backStack.open(CapitalRoute) }
+        11 -> WeekLink("Бланк 9. Карта кластера") { backStack.add(ClusterRoute) }
+        12 -> WeekLink("Бланки 10 и 11. Кристалл смысла") { backStack.add(CrystalRoute) }
     }
+}
+
+private fun pathHint(tab: Int): String = when (tab) {
+    0 -> "Сейчас шаги. Дальше — бланк."
+    1 -> "Сейчас бланк. Дальше — расчёт."
+    2 -> "Сейчас расчёт по формуле журнала. Дальше — критерий готовности."
+    3 -> "Сейчас критерий готовности. К следующей неделе нужны три письменных ответа и подтверждение маркера. Если критерий не выполнен, неделю повторяют: это штатный режим."
+    else -> "Сейчас Точка калибровки: три письменных ответа. Затем вернитесь к готовности и подтвердите маркер."
+}
+
+internal fun routeReason(ui: org.interferolog.fibt.data.JournalUi): String? {
+    val cycle = ui.cycle ?: return null
+    val test = ui.test ?: return null
+    val letters = test.answers.split(",").mapNotNull { runCatching { Letter.valueOf(it.trim()) }.getOrNull() }
+    if (letters.size != 7) return null
+    return routeExplanation(PhaseAnswers(test.moneyCoversMonth, test.noOverdue, letters), cycle.fullCycleCompleted)
 }
 
 @Composable
 private fun WeekLink(label: String, onClick: () -> Unit) {
-    ListItem(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        content = { Text(label) },
-    )
+    TonalButton(text = label, modifier = Modifier.fillMaxWidth(), onClick = onClick)
 }
 
 @Composable
@@ -376,7 +481,8 @@ private fun restLine(ui: org.interferolog.fibt.data.JournalUi): String {
     val rest = ui.rest ?: return "Масса покоя ещё не записана."
     val minimum = carryingMinimum(rest.support, rest.tool, rest.obligations)
     val months = runwayMonths(rest.balance, minimum)
-    val zone = months?.let { runwayLabel(runwayZone(it, profileMonths(rest.profile))) } ?: "—"
+    val profile = profileMonths(rest.profile)
+    val zone = months?.let { runwayLabel(runwayZone(it, profile), profile) } ?: "—"
     val runway = months?.let { "%.1f мес.".format(it) } ?: "—"
     return "Emin ${formatRubles(minimum)}. M = B / Emin = $runway. $zone. Первое сечение ${"%.0f".format(rest.firstCutPercent)}%."
 }
@@ -384,9 +490,11 @@ private fun restLine(ui: org.interferolog.fibt.data.JournalUi): String {
 private fun crisisLine(ui: org.interferolog.fibt.data.JournalUi): String {
     val map = ui.crisis ?: return "Карта кризиса ещё не сохранена."
     val tranche = weeklyTranche(map.emergencyMinimum)
+    val remainder = weeklyTrancheRemainder(map.emergencyMinimum)
+    val leftover = if (remainder == 0L) "" else " Остаток ${formatRubles(remainder)} остаётся в запасе."
     val open = ui.quarantines.any { it.endsAt > System.currentTimeMillis() }
     val gate = if (open) "Карантин на резкие решения ещё идёт." else "Открытого карантина нет."
-    return "Аварийный минимум ${formatRubles(map.emergencyMinimum)}. Недельный транш ${formatRubles(tranche)}. $gate"
+    return "Аварийный минимум ${formatRubles(map.emergencyMinimum)}. Недельный транш ${formatRubles(tranche)}.$leftover $gate"
 }
 
 private fun fanLine(ui: org.interferolog.fibt.data.JournalUi): String {
@@ -426,16 +534,11 @@ private fun ringLine(ui: org.interferolog.fibt.data.JournalUi): String {
 
 internal fun runwayTone(zone: RunwayZone): CardTone = when (zone) {
     RunwayZone.CRITICAL, RunwayZone.VULNERABLE -> CardTone.Error
+    RunwayZone.BELOW_NORM -> CardTone.Tertiary
     else -> CardTone.Primary
 }
 
-internal fun runwayLabel(zone: RunwayZone): String = when (zone) {
-    org.interferolog.fibt.domain.RunwayZone.CRITICAL -> "Критический запас"
-    org.interferolog.fibt.domain.RunwayZone.VULNERABLE -> "Уязвимый запас"
-    org.interferolog.fibt.domain.RunwayZone.HIRE -> "Профиль найма, от 6 месяцев"
-    org.interferolog.fibt.domain.RunwayZone.FREELANCE -> "Профиль фриланса, от 12 месяцев"
-    org.interferolog.fibt.domain.RunwayZone.BUSINESS -> "Профиль дела, от 24 месяцев"
-}
+internal fun runwayLabel(zone: RunwayZone, profileMonths: Int): String = runwayZoneLabel(zone, profileMonths)
 
 private fun loggedHourDays(ui: org.interferolog.fibt.data.JournalUi): Int =
     ui.hours.map { it.day }.toSet().size
