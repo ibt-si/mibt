@@ -66,6 +66,7 @@ class JournalViewModel(app: Application) : AndroidViewModel(app) {
                 System.currentTimeMillis(),
             )
             _priorFullCycle.value = repo.fullCycleAlreadyCompleted()
+            _notice.value = "Маршрут записан. Дальше — шаги текущей недели, затем бланк и расчёт."
         }
     }
 

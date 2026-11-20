@@ -18,6 +18,7 @@ import org.interferolog.fibt.JournalViewModel
 import org.interferolog.fibt.content.JournalCanon
 import org.interferolog.fibt.data.ReminderPlanEntity
 import org.interferolog.fibt.domain.repairWeekForMarker
+import org.interferolog.fibt.navigation.GuideRoute
 import org.interferolog.fibt.navigation.IntakeRoute
 import org.interferolog.fibt.navigation.WeekRoute
 import java.time.LocalDate
@@ -53,6 +54,7 @@ fun MaintenanceScreen(viewModel: JournalViewModel, backStack: NavBackStack<NavKe
             }
         }
         ReminderEditor(viewModel)
+        TonalButton("Как пользоваться журналом") { backStack.add(GuideRoute) }
         OutlinedButton(onClick = { backStack.add(IntakeRoute) }) { Text("Пройти тест заново") }
         TonalButton("Экспорт в Markdown") { backStack.add(org.interferolog.fibt.navigation.ExportRoute) }
     }
@@ -61,9 +63,14 @@ fun MaintenanceScreen(viewModel: JournalViewModel, backStack: NavBackStack<NavKe
 @Composable
 fun ScriptsScreen() {
     ScreenColumn {
+        BodyText("Где в журнале есть готовая фраза, она приведена дословно. Где журнал только отсылает к главе, ниже подсказка, что записать своими словами по шаблону журнала.")
         JournalCanon.scripts.forEach { card ->
             SectionTitle(card.title)
-            BodyText(card.body)
+            if (card.quoted) {
+                QuietCard(card.body)
+            } else {
+                BodyText(card.body)
+            }
             MetaText(card.where)
         }
     }

@@ -26,6 +26,7 @@ import kotlinx.serialization.Serializable
 @Serializable data object ScriptsRoute : NavKey
 @Serializable data object ExportRoute : NavKey
 @Serializable data object IntakeRoute : NavKey
+@Serializable data object GuideRoute : NavKey
 
 fun NavBackStack<NavKey>.reveal(route: NavKey) {
     val existing = indexOfLast { it == route }

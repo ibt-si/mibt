@@ -6,10 +6,12 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Adjust
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Map as FilledMap
 import androidx.compose.material.icons.automirrored.filled.MenuBook as FilledMenuBook
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Payments
+import androidx.compose.material.icons.outlined.Info as OutlinedInfo
 import androidx.compose.material.icons.outlined.Map as OutlinedMap
 import androidx.compose.material.icons.automirrored.outlined.MenuBook as OutlinedMenuBook
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -46,6 +48,7 @@ import org.interferolog.fibt.ui.CrisisScreen
 import org.interferolog.fibt.ui.CrystalScreen
 import org.interferolog.fibt.ui.ExportScreen
 import org.interferolog.fibt.ui.FamilyScreen
+import org.interferolog.fibt.ui.GuideScreen
 import org.interferolog.fibt.ui.FanScreen
 import org.interferolog.fibt.ui.HolterScreen
 import org.interferolog.fibt.ui.IntakeScreen
@@ -89,6 +92,7 @@ private val navConfig = SavedStateConfiguration {
             subclass(ScriptsRoute::class)
             subclass(ExportRoute::class)
             subclass(IntakeRoute::class)
+            subclass(GuideRoute::class)
         }
     }
 }
@@ -131,6 +135,13 @@ fun FibtNav(viewModel: JournalViewModel, openToken: Int, openTarget: String?) {
                 },
                 actions = {
                     if (top !is SilenceGateRoute) {
+                        DestinationAction(
+                            selected = top is GuideRoute,
+                            label = "Как пользоваться",
+                            filled = Icons.Filled.Info,
+                            outlined = Icons.Outlined.OutlinedInfo,
+                            onClick = { backStack.reveal(GuideRoute) },
+                        )
                         DestinationAction(
                             selected = top is MapRoute,
                             label = "Маршрут",
@@ -191,12 +202,17 @@ fun FibtNav(viewModel: JournalViewModel, openToken: Int, openTarget: String?) {
             entryProvider = entryProvider {
                 entry<HomeRoute> {
                     when {
-                        ui.cycle == null -> IntakeScreen(viewModel)
+                        ui.cycle == null -> GuideScreen(onStartTest = { backStack.add(IntakeRoute) })
                         week == null -> MaintenanceScreen(viewModel, backStack)
                         else -> WeekScreen(viewModel, week, backStack)
                     }
                 }
-                entry<IntakeRoute> { IntakeScreen(viewModel) }
+                entry<GuideRoute> {
+                    GuideScreen(onStartTest = if (ui.cycle == null) ({ backStack.add(IntakeRoute) }) else null)
+                }
+                entry<IntakeRoute> {
+                    IntakeScreen(viewModel, onRecorded = { backStack.removeLastOrNull() })
+                }
                 entry<MapRoute> { MapScreen(viewModel, backStack) }
                 entry<WeekRoute> { route -> WeekScreen(viewModel, route.number, backStack) }
                 entry<SilenceGateRoute> { route ->
@@ -248,10 +264,11 @@ private fun DestinationAction(
 
 private fun screenTitle(top: NavKey?, week: Int?, intake: Boolean): String = when (top) {
     null, HomeRoute -> when {
-        intake -> "Входной тест"
+        intake -> "Как пользоваться журналом"
         week == null -> "Штатное обслуживание"
         else -> JournalCanon.week(week).title
     }
+    GuideRoute -> "Как пользоваться журналом"
     MapRoute -> "Маршрут"
     is WeekRoute -> JournalCanon.week(top.number).title
     is SilenceGateRoute -> "Минута тишины"
@@ -278,8 +295,21 @@ private fun screenTitle(top: NavKey?, week: Int?, intake: Boolean): String = whe
 
 private fun screenSubtitle(top: NavKey?, week: Int?, intake: Boolean, title: String): String {
     val context = when {
-        intake -> "Входной тест"
+        top is IntakeRoute -> "Входной тест"
+        intake || top is GuideRoute -> "Сначала порядок работы, затем тест"
         top is WeekRoute -> "Неделя ${top.number}"
+        top is HolterRoute || top is QuickSpendRoute -> "Неделя 3. Бланк"
+        top is SourcesRoute -> "Неделя 4. Бланк"
+        top is PriceRoute -> "Недели 4–5. Тренажёр цены"
+        top is WorkRoute -> "Неделя 5. Бланк"
+        top is FamilyRoute -> "Неделя 6. Бланк"
+        top is RestRoute -> "Неделя 7. Бланк"
+        top is CrisisRoute -> "Неделя 8. Бланк"
+        top is FanRoute -> "Неделя 9. Бланк"
+        top is CapitalRoute -> "Неделя 10. Бланк"
+        top is ClusterRoute -> "Неделя 11. Бланк"
+        top is CrystalRoute -> "Неделя 12. Бланк"
+        top is SilenceGateRoute -> "Минута перед расчётом"
         week == null -> "Штатное обслуживание"
         else -> "Неделя $week"
     }
