@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Бортовой журнал</string>
+    <string name="widget_name">Пауза 3 секунды</string>
+    <string name="widget_description">Два касания, чтобы записать паузу перед оплатой</string>
+</resources>
