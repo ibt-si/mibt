@@ -1,12 +1,10 @@
-# FIBT — «Бортовой журнал: Физика денег по ТИС»
-
 [English](#english) | [Русский](#русский)
 
 <a id="english"></a>
 
-# FIBT — “Flight log: The Physics of Money according to TIS”
+# FIBT — “Flight log: The Physics of Money according to IBT”
 
-An Android app that accompanies Vadim N. Cherashev’s book *The Physics of Money according to TIS*. It is a digital version of the book’s “Flight log”: twelve weeks of practice, forms, calculations and readiness markers in one place. The app is not an expense tracker. It works as an instrument panel: it shows where the financial circuit is losing resource, and it walks the user through assembling that circuit step by step.
+An Android app that accompanies Vadim N. Cherashev’s book *The Physics of Money according to IBT*. It is a digital version of the book’s “Flight log”: twelve weeks of practice, forms, calculations and readiness markers in one place. The app is not an expense tracker. It works as an instrument panel: it shows where the financial circuit is losing resource, and it walks the user through assembling that circuit step by step.
 
 > The calculations in the app illustrate the book’s method. This is not financial or investment advice.
 
@@ -120,16 +118,11 @@ The specification of the digital log is the file `Приложение FIBT.md`.
 
 ## Stack
 
-- Language: Kotlin 2.2.10
-- Build: Android Gradle Plugin 9.5.1, Gradle 9.6.0 (wrapper), Java 21
-- Platform: Android, `minSdk` 26, `targetSdk` 36, `compileSdk` 37
-- UI: Jetpack Compose (Compose UI 1.12.0, Material 3 1.5.0), Navigation 3 1.2.2
-- Persistence: Room 2.8.5, local database `fibt.db`
+- Language: Kotlin
+- Platform: Android, `minSdk` 26
+- UI: Jetpack Compose (Compose UI, Material 3 Expressive), Navigation 3
+- Persistence: Room
 - Widget: Jetpack Glance 1.2.0 (home-screen widget “3-second pause”)
-- Also used: Kotlin Serialization 1.9.0, Coroutines 1.10.2, KSP 2.2.10-2.0.2
-- Package / `applicationId`: `org.interferolog.fibt`
-- App version in Gradle: `1.0` (`versionCode` 1)
-- Single module: `:app`
 
 The app also has three silent daily Point C reminders and a Markdown telemetry export. Data stays on the device.
 
@@ -306,16 +299,11 @@ Android-приложение к книге Вадима Н. Черашева «�
 
 ## Стек
 
-- Язык: Kotlin 2.2.10
-- Сборка: Android Gradle Plugin 9.5.1, Gradle 9.6.0 (wrapper), Java 21
-- Платформа: Android, `minSdk` 26, `targetSdk` 36, `compileSdk` 37
-- UI: Jetpack Compose (Compose UI 1.12.0, Material 3 1.5.0), Navigation 3 1.2.2
-- Данные: Room 2.8.5, локальная база `fibt.db`
-- Виджет: Jetpack Glance 1.2.0 (виджет на рабочем столе «Пауза 3 секунды»)
-- Также используются: Kotlin Serialization 1.9.0, Coroutines 1.10.2, KSP 2.2.10-2.0.2
-- Пакет / `applicationId`: `org.interferolog.fibt`
-- Версия приложения в Gradle: `1.0` (`versionCode` 1)
-- Один модуль: `:app`
+- Язык: Kotlin
+- Платформа: Android, `minSdk` 26
+- Интерфейс: Jetpack Compose (Compose UI, Material 3 Expressive), Navigation 3
+- БД: Room
+- Виджет: Jetpack Glance (Виджет «Пауза 3 секунды»)
 
 В приложении также есть три бесшумных ежедневных напоминания «Точка C» и экспорт телеметрии в Markdown. Данные остаются на устройстве.
 
