@@ -1,0 +1,211 @@
+name: Release APK
+
+# Publishes a signed release APK whenever versionCode / versionName in
+# app/build.gradle.kts change. Releases are keyed by tag v<versionName>-<versionCode>,
+# so the job is idempotent: pushing the same version again does nothing.
+
+on:
+  push:
+    branches: [master, main]
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Replace APK assets even if this version was already released'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Read version from app/build.gradle.kts
+        id: version
+        run: |
+          set -euo pipefail
+          version_code="$(sed -nE 's/^[[:space:]]*versionCode[[:space:]]*=[[:space:]]*([0-9]+).*/\1/p' app/build.gradle.kts | head -n 1)"
+          version_name="$(sed -nE 's/^[[:space:]]*versionName[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' app/build.gradle.kts | head -n 1)"
+          if [[ -z "$version_code" || -z "$version_name" ]]; then
+            echo "::error::Cannot read versionCode/versionName from app/build.gradle.kts"
+            exit 1
+          fi
+          tag="v${version_name}-${version_code}"
+          echo "code=$version_code" >> "$GITHUB_OUTPUT"
+          echo "name=$version_name" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "Version: $version_name ($version_code), tag: $tag"
+
+      - name: Check whether this version is already released
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          FORCE: ${{ inputs.force || 'false' }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            if [[ "$FORCE" == "true" ]]; then
+              echo "publish=true" >> "$GITHUB_OUTPUT"
+              echo "::notice::Release $TAG exists; force enabled, APK assets will be replaced."
+            else
+              echo "publish=false" >> "$GITHUB_OUTPUT"
+              echo "::notice::Release $TAG already exists. Nothing to publish."
+            fi
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up JDK 21
+        if: steps.check.outputs.publish == 'true'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        if: steps.check.outputs.publish == 'true'
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Restore release signing key
+        if: steps.check.outputs.publish == 'true'
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          SIGNING_DIR: ${{ runner.temp }}/mibt-signing
+        run: |
+          set -euo pipefail
+          missing=0
+          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "::error::Missing repository secret $name (see README for release setup)"
+              missing=1
+            fi
+          done
+          [[ "$missing" -eq 0 ]] || exit 1
+
+          mkdir -p "$SIGNING_DIR"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode --ignore-garbage > "$SIGNING_DIR/release.jks"
+          test -s "$SIGNING_DIR/release.jks" || { echo "::error::Decoded keystore is empty"; exit 1; }
+
+          # Write keystore.properties with java.util.Properties-safe escaping.
+          python3 - <<'PY'
+          import os
+
+          def escape(value):
+              value = (value.replace("\\", "\\\\")
+                             .replace("\n", "\\n")
+                             .replace("\r", "\\r")
+                             .replace("\f", "\\f"))
+              return "\\" + value if value.startswith(" ") else value
+
+          signing_dir = os.path.join(os.environ["RUNNER_TEMP"], "mibt-signing")
+          values = {
+              "storeFile": os.path.join(signing_dir, "release.jks"),
+              "storePassword": os.environ["ANDROID_KEYSTORE_PASSWORD"],
+              "keyAlias": os.environ["ANDROID_KEY_ALIAS"],
+              "keyPassword": os.environ["ANDROID_KEY_PASSWORD"],
+          }
+          with open("keystore.properties", "w", encoding="utf-8") as properties:
+              for key, value in values.items():
+                  properties.write(f"{key}={escape(value)}\n")
+          PY
+
+      - name: Build signed release APK
+        if: steps.check.outputs.publish == 'true'
+        run: ./gradlew --no-daemon assembleRelease
+
+      - name: Verify and package APK
+        id: package
+        if: steps.check.outputs.publish == 'true'
+        env:
+          VERSION_NAME: ${{ steps.version.outputs.name }}
+          VERSION_CODE: ${{ steps.version.outputs.code }}
+          TAG: ${{ steps.version.outputs.tag }}
+          REPOSITORY: ${{ github.repository }}
+          SIGNING_DIR: ${{ runner.temp }}/mibt-signing
+        run: |
+          set -euo pipefail
+          mapfile -t apks < <(find app/build/outputs/apk/release -maxdepth 1 -type f -name '*.apk')
+          if [[ "${#apks[@]}" -ne 1 ]]; then
+            echo "::error::Expected exactly one release APK, found ${#apks[@]}: ${apks[*]:-none}"
+            exit 1
+          fi
+
+          apksigner="$(find "${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}/build-tools" -type f -name apksigner 2>/dev/null | sort -V | tail -n 1 || true)"
+          if [[ -n "$apksigner" ]]; then
+            "$apksigner" verify --print-certs "${apks[0]}"
+          else
+            echo "::warning::apksigner not found, skipping signature verification"
+          fi
+
+          apk_name="mibt-${VERSION_NAME}-${VERSION_CODE}-release.apk"
+          cp "${apks[0]}" "$SIGNING_DIR/$apk_name"
+          (cd "$SIGNING_DIR" && sha256sum "$apk_name" > "$apk_name.sha256")
+
+          cat > "$SIGNING_DIR/release-notes.md" <<EOF
+          MiBT ${VERSION_NAME} (versionCode ${VERSION_CODE})
+
+          - [Скачать APK](https://github.com/${REPOSITORY}/releases/download/${TAG}/${apk_name})
+          - Checksum: \`$apk_name.sha256\` (SHA-256)
+          - Commit: \`${GITHUB_SHA}\`
+          EOF
+
+          echo "apk=$SIGNING_DIR/$apk_name" >> "$GITHUB_OUTPUT"
+          echo "checksum=$SIGNING_DIR/$apk_name.sha256" >> "$GITHUB_OUTPUT"
+          echo "notes=$SIGNING_DIR/release-notes.md" >> "$GITHUB_OUTPUT"
+
+      - name: Publish GitHub release
+        if: steps.check.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          TITLE: MiBT ${{ steps.version.outputs.name }} (${{ steps.version.outputs.code }})
+          EXISTS: ${{ steps.check.outputs.exists }}
+          APK: ${{ steps.package.outputs.apk }}
+          CHECKSUM: ${{ steps.package.outputs.checksum }}
+          NOTES: ${{ steps.package.outputs.notes }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [[ "$EXISTS" == "true" ]]; then
+            gh release upload "$TAG" "$APK" "$CHECKSUM" --clobber
+          else
+            # --target only applies when gh has to create the tag itself.
+            target_args=(--target "$COMMIT")
+            if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+              target_args=()
+            fi
+            gh release create "$TAG" "$APK" "$CHECKSUM" \
+              "${target_args[@]}" \
+              --title "$TITLE" \
+              --notes-file "$NOTES"
+          fi
+
+      - name: Write job summary
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          PUBLISH: ${{ steps.check.outputs.publish }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          if [[ "$PUBLISH" == "true" ]]; then
+            {
+              echo "### APK release published"
+              echo "Tag: \`$TAG\`"
+              echo "https://github.com/$REPOSITORY/releases/tag/$TAG"
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### No new version — release \`$TAG\` already exists" >> "$GITHUB_STEP_SUMMARY"
+          fi
