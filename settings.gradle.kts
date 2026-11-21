@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "fibt"
+rootProject.name = "mibt"
 include(":app")

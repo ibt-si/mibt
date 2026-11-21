@@ -6,11 +6,11 @@ plugins {
 }
 
 android {
-    namespace = "org.interferolog.fibt"
+    namespace = "org.interferolog.mibt"
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "org.interferolog.fibt"
+        applicationId = "org.interferolog.mibt"
         minSdk = 26
         targetSdk = 36
         versionCode = 1
