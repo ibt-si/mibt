@@ -72,6 +72,7 @@ import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
 import kotlinx.serialization.modules.subclass
 import org.interferolog.mibt.JournalViewModel
+import org.interferolog.mibt.content.BlankCanon
 import org.interferolog.mibt.content.JournalCanon
 import org.interferolog.mibt.currentWeekNumber
 import org.interferolog.mibt.ui.CaptureScreen
@@ -422,8 +423,8 @@ private fun screenTitle(top: NavKey?, week: Int?, intake: Boolean): String = whe
     is SilenceGateRoute -> "Минута тишины"
     HolterRoute -> "Холтер четырёх узлов"
     QuickSpendRoute -> "Быстрая запись траты"
-    PauseRoute -> "Пауза 3 секунды"
-    PointCRoute -> "Точка C"
+    PauseRoute -> BlankCanon.phaseDiary.title
+    PointCRoute -> BlankCanon.pointC.title
     SourcesRoute -> "Индекс сопротивления источников"
     PriceRoute -> "Тренажёр цены"
     WorkRoute -> "Дела участка"

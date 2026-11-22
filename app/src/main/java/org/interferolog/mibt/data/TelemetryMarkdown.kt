@@ -3,6 +3,7 @@
 
 package org.interferolog.mibt.data
 
+import org.interferolog.mibt.content.BlankCanon
 import org.interferolog.mibt.domain.formatRubles
 import org.interferolog.mibt.domain.routeTitle
 import org.interferolog.mibt.domain.RouteKind
@@ -82,12 +83,12 @@ fun exportTelemetry(snapshot: TelemetrySnapshot, zone: ZoneId = ZoneId.systemDef
         }
     }
     lines += ""
-    lines += "## Бланк 1. Дневник фазы"
+    lines += "## ${BlankCanon.phaseDiary.title}"
     tableOrEmpty(lines, snapshot.diary) { entry ->
         "| ${at(entry.atMillis)} | ${entry.amountKopecks?.let(::formatRubles) ?: "—"} | ${entry.impulse} | ${entry.bodyMarker} | ${entry.context} | ${entry.fact} |"
     }
     lines += ""
-    lines += "## Бланк 2а. Колодец или Точка C"
+    lines += "## ${BlankCanon.pointC.title}"
     tableOrEmpty(lines, snapshot.wells) { entry ->
         "| ${at(entry.atMillis)} | ${entry.situation} | ${entry.question} | ${entry.spasm} | ${entry.pauseEffect} |"
     }

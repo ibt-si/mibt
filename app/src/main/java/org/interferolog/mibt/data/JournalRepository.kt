@@ -243,7 +243,11 @@ class JournalRepository(private val db: MibtDatabase) {
 
     suspend fun saveDiary(entry: PhaseDiaryEntryEntity) = dao.insertDiary(entry)
 
+    suspend fun deleteDiary(id: Long) = dao.deleteDiary(id)
+
     suspend fun saveWell(entry: WellEntryEntity) = dao.insertWell(entry)
+
+    suspend fun deleteWell(id: Long) = dao.deleteWell(id)
 
     suspend fun saveSpend(
         cycleId: Long,

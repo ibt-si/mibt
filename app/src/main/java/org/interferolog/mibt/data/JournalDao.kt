@@ -74,6 +74,9 @@ interface JournalDao {
     @Insert
     suspend fun insertDiary(entry: PhaseDiaryEntryEntity)
 
+    @Query("DELETE FROM phase_diary WHERE id = :id")
+    suspend fun deleteDiary(id: Long)
+
     @Query("SELECT * FROM phase_diary WHERE cycleId = :cycleId ORDER BY atMillis DESC")
     fun observeDiary(cycleId: Long): Flow<List<PhaseDiaryEntryEntity>>
 
@@ -82,6 +85,9 @@ interface JournalDao {
 
     @Insert
     suspend fun insertWell(entry: WellEntryEntity)
+
+    @Query("DELETE FROM well_entries WHERE id = :id")
+    suspend fun deleteWell(id: Long)
 
     @Query("SELECT * FROM well_entries WHERE cycleId = :cycleId ORDER BY atMillis DESC")
     fun observeWells(cycleId: Long): Flow<List<WellEntryEntity>>

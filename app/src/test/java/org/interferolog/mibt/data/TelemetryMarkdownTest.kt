@@ -3,6 +3,7 @@
 
 package org.interferolog.mibt.data
 
+import org.interferolog.mibt.content.BlankCanon
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -57,5 +58,7 @@ class TelemetryMarkdownTest {
         )
         assertTrue(text.contains("4700"))
         assertTrue(text.contains("открытым текстом"))
+        assertTrue(text.contains("## ${BlankCanon.phaseDiary.title}"))
+        assertTrue(text.contains("## ${BlankCanon.pointC.title}"))
     }
 }
