@@ -93,7 +93,7 @@ fun exportTelemetry(snapshot: TelemetrySnapshot, zone: ZoneId = ZoneId.systemDef
         "| ${at(entry.atMillis)} | ${entry.situation} | ${entry.question} | ${entry.spasm} | ${entry.pauseEffect} |"
     }
     lines += ""
-    lines += "## Бланк 2. Холтер"
+    lines += "## ${BlankCanon.holter.title}"
     tableOrEmpty(lines, snapshot.spends) { entry ->
         "| ${at(entry.atMillis)} | ${entry.node} | ${formatRubles(entry.amountKopecks)} | ${if (entry.cleanSheet) "чистый лист" else ""} | ${entry.note} |"
     }
@@ -103,7 +103,7 @@ fun exportTelemetry(snapshot: TelemetrySnapshot, zone: ZoneId = ZoneId.systemDef
         "| ${formatRubles(bill.amountKopecks)} | открыт ${at(bill.openedAt)} | ${bill.settledAt?.let { "перевод ${at(it)}" } ?: "открыт"} |"
     }
     lines += ""
-    lines += "## Бланк 3. Источники"
+    lines += "## ${BlankCanon.sources.title}"
     tableOrEmpty(lines, snapshot.sources) { source ->
         "| ${source.name} | ${formatRubles(source.netIncomeKopecks)} | ${source.contractHours}+${source.frictionHours} ч | R ${source.frictionScore} |"
     }
@@ -113,7 +113,7 @@ fun exportTelemetry(snapshot: TelemetrySnapshot, zone: ZoneId = ZoneId.systemDef
         "| ${at(item.createdAt)} | тишина ${yesNo(item.silenceHeld)} | ${item.outcome} |"
     }
     lines += ""
-    lines += "## Бланк 3н и часы"
+    lines += "## ${BlankCanon.work.title}"
     tableOrEmpty(lines, snapshot.work) { item ->
         "| ${item.name} | ${item.mark} | D ${item.resultShare} | h ${item.hoursShare} | R ${item.frictionScore} |"
     }

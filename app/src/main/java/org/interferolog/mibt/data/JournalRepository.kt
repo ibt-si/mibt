@@ -285,6 +285,13 @@ class JournalRepository(private val db: MibtDatabase) {
         return true
     }
 
+    suspend fun deleteSpend(id: Long) {
+        db.withTransaction {
+            dao.deleteBillsForSpend(id)
+            dao.deleteSpend(id)
+        }
+    }
+
     suspend fun settleBill(bill: MirrorBillEntity, now: Long) {
         db.withTransaction {
             dao.settleBill(bill.id, now)
@@ -302,9 +309,12 @@ class JournalRepository(private val db: MibtDatabase) {
     }
 
     suspend fun saveSource(source: IncomeSourceEntity) = dao.insertSource(source)
+    suspend fun updateSource(source: IncomeSourceEntity) = dao.updateSource(source)
     suspend fun deleteSource(id: Long) = dao.deleteSource(id)
     suspend fun saveRehearsal(entry: PriceRehearsalEntity) = dao.insertRehearsal(entry)
     suspend fun saveWork(item: WorkItemEntity) = dao.insertWork(item)
+    suspend fun updateWork(item: WorkItemEntity) = dao.updateWork(item)
+    suspend fun deleteWork(id: Long) = dao.deleteWork(id)
     suspend fun saveHour(entry: HourLogEntity) = dao.insertHour(entry)
     suspend fun saveFamily(plan: FamilyPlanEntity) = dao.upsertFamily(plan)
     suspend fun saveRest(rest: RestMassEntity) = dao.upsertRest(rest)

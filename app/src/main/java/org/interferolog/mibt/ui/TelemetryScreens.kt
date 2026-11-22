@@ -37,11 +37,16 @@ import org.interferolog.mibt.content.JournalCanon
 import org.interferolog.mibt.content.POINT_C
 import org.interferolog.mibt.data.JournalUi
 import org.interferolog.mibt.data.PhaseDiaryEntryEntity
+import org.interferolog.mibt.data.SpendEntryEntity
 import org.interferolog.mibt.data.WellEntryEntity
+import org.interferolog.mibt.domain.HolterDayFigures
+import org.interferolog.mibt.domain.HolterMirror
+import org.interferolog.mibt.domain.HolterMovement
 import org.interferolog.mibt.domain.etaBand
 import org.interferolog.mibt.domain.etaBandLabel
 import org.interferolog.mibt.domain.formatRatio
 import org.interferolog.mibt.domain.formatRubles
+import org.interferolog.mibt.domain.holterWeeks
 import org.interferolog.mibt.domain.parseRubles
 import java.time.Instant
 import java.time.LocalDate
@@ -179,8 +184,20 @@ fun HolterScreen(viewModel: JournalViewModel) {
     val missed = missedDays(ui)
     val ratio = currentEta(ui)
     val obz = ui.spends.filter { it.node == "OBZ" }.sumOf { it.amountKopecks }
+    val blank = BlankCanon.holter
+    val zone = ZoneId.systemDefault()
+    val weeks = holterWeeks(
+        movements = ui.spends.map { HolterMovement(it.atMillis, it.node, it.amountKopecks) },
+        mirrors = ui.bills.map { HolterMirror(it.openedAt, it.amountKopecks) },
+        zone = zone,
+        today = LocalDate.now(zone),
+        dayLabels = blank.rowLabels.dropLast(1),
+        totalLabel = blank.rowLabels.last(),
+    )
 
     ScreenColumn {
+        BlankHeader(blank)
+        blank.notes.forEach { QuietCard(it, CardTone.Secondary) }
         MetricCard(
             value = ratio?.let(::formatRatio) ?: "—",
             caption = "Индекс η",
@@ -208,7 +225,7 @@ fun HolterScreen(viewModel: JournalViewModel) {
         }
         if (missed > 0) {
             SectionCard(tone = CardTone.Tertiary) {
-                BodyText("Пропущенные дни можно закрыть одной строкой в Шум и продолжить с сегодняшнего вечера. Пропущено дней: $missed.")
+                MetaText("Пропущено дней: $missed.")
                 CleanSheetForm(viewModel)
             }
         }
@@ -248,6 +265,25 @@ fun HolterScreen(viewModel: JournalViewModel) {
                 )
             }
         }
+        weeks.forEach { week ->
+            if (weeks.size > 1) {
+                val first = week.days.first().date
+                val last = week.days.last().date
+                if (first != null && last != null) {
+                    SectionHeader("${dayDate.format(first)} — ${dayDate.format(last)}")
+                }
+            }
+            week.days.forEach { day ->
+                ColumnCard(day.label, blank.columns, holterCells(day))
+            }
+            ColumnCard(week.total.label, blank.columns, holterCells(week.total))
+        }
+        SectionHeader("Записи трат")
+        EntryList(
+            columns = listOf("Дата", "Узел", "Сумма", "Заметка"),
+            entries = ui.spends.sortedByDescending { it.atMillis }.map { EntryLine(it.id, spendCells(it)) },
+            onDelete = viewModel::deleteSpend,
+        )
     }
 }
 
@@ -337,6 +373,44 @@ private fun SpendForm(viewModel: JournalViewModel, cleanSheet: Boolean, title: S
 }
 
 private val entryTime: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")
+private val dayDate: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy")
+
+private fun holterCells(day: HolterDayFigures): List<String> = listOf(
+    day.date?.format(dayDate) ?: "—",
+    incomeAndObligations(day.incomeKopecks, day.obligationsKopecks),
+    moneyOrDash(day.supportKopecks),
+    moneyOrDash(day.toolKopecks),
+    moneyOrDash(day.growthKopecks),
+    moneyOrDash(day.noiseKopecks),
+    moneyOrDash(day.doubleTariffKopecks),
+    day.etaRatio?.let(::formatRatio) ?: "—",
+)
+
+private fun incomeAndObligations(income: Long, obligations: Long): String = when {
+    income == 0L && obligations == 0L -> "—"
+    obligations == 0L -> formatRubles(income)
+    income == 0L -> "Обз ${formatRubles(obligations)}"
+    else -> "${formatRubles(income)}; Обз ${formatRubles(obligations)}"
+}
+
+private fun moneyOrDash(kopecks: Long): String = if (kopecks == 0L) "—" else formatRubles(kopecks)
+
+private fun spendCells(entry: SpendEntryEntity): List<String> = listOf(
+    formatEntryTime(entry.atMillis),
+    spendNodeLabel(entry.node),
+    formatRubles(entry.amountKopecks),
+    entry.note.ifBlank { "—" },
+)
+
+private fun spendNodeLabel(node: String): String = when (node) {
+    "U1" -> "U₁ Опора"
+    "U2" -> "U₂ Инструмент"
+    "U3" -> "U₃ Рост"
+    "U4" -> "U₄ Шум"
+    "OBZ" -> "Обз"
+    "INCOME" -> "Доход"
+    else -> node
+}
 
 private fun formatEntryTime(millis: Long): String =
     entryTime.format(Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()))

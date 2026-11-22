@@ -13,7 +13,7 @@ class BlankCanonTest {
     @Test
     fun structuralInvariants() {
         val blanks = BlankCanon.all
-        assertEquals(listOf("1", "2а"), blanks.map { it.number })
+        assertEquals(listOf("1", "2а", "2", "3", "3н"), blanks.map { it.number })
         assertEquals(0x0430, blanks.first { it.number.startsWith("2") }.number[1].code)
         blanks.forEach { blank ->
             assertTrue(blank.title.matches(Regex("^Бланк \\S+\\. .+")))
@@ -29,12 +29,17 @@ class BlankCanonTest {
                     assertEquals(table.header.size, row.size)
                 }
             }
-            assertTrue(blank.entriesTitle.isNotEmpty())
-            assertFalse(blank.entriesTitle.endsWith(":"))
-            assertTrue(blank.examples.isNotEmpty())
+            if (blank.entriesTitle.isNotEmpty()) {
+                assertFalse(blank.entriesTitle.endsWith(":"))
+            }
             blank.examples.forEach { row ->
                 assertEquals(blank.columns.size, row.size)
             }
+        }
+        assertTrue(BlankCanon.phaseDiary.examples.isNotEmpty())
+        assertTrue(BlankCanon.pointC.examples.isNotEmpty())
+        listOf(BlankCanon.holter, BlankCanon.sources, BlankCanon.work).forEach {
+            assertTrue(it.examples.isEmpty())
         }
         val marker = blanks.first { it.number == "1" }.referenceTables.single()
         assertEquals(
@@ -185,10 +190,122 @@ class BlankCanonTest {
         assertTrue(blank.examples.single().last().contains("—"))
     }
 
+    @Test
+    fun holterMatchesJournalHeadingColumnsAndSkipRule() {
+        val blank = BlankCanon.holter
+        assertEquals("Бланк 2. Холтер четырёх узлов", blank.title)
+        assertEquals(0x0451, blank.title[blank.title.indexOf('ё')].code)
+        assertEquals(
+            listOf(
+                "Дата",
+                "Доход; Обз отдельно",
+                "U₁ Опора",
+                "U₂ Инструмент",
+                "U₃ Рост",
+                "U₄ Шум",
+                "Двойной тариф",
+                "η",
+            ),
+            blank.columns,
+        )
+        assertEquals(0x2081, blank.columns[2][1].code)
+        assertEquals(0x03B7, blank.columns.last().single().code)
+        assertEquals(
+            listOf("День 1", "День 2", "День 3", "День 4", "День 5", "День 6", "День 7", "Итого за неделю"),
+            blank.rowLabels,
+        )
+        assertEquals(
+            "Правило пропусков: если вечер пропущен, примерная сумма вписывается в U₄, и запись спокойно продолжается с сегодняшнего вечера. Холтер из-за пропуска не бросается.",
+            blank.notes.single(),
+        )
+    }
+
+    @Test
+    fun sourcesMatchJournalHeadingColumnsAndFrictionNote() {
+        val blank = BlankCanon.sources
+        assertEquals("Бланк 3. Индекс сопротивления источников", blank.title)
+        assertEquals(
+            listOf(
+                "№",
+                "Источник",
+                "Чистый доход за месяц",
+                "Dᵢ, % дохода",
+                "Часы и hᵢ, % часов",
+                "Sᵢ, ₽/ч",
+                "Rᵢ, 1–10",
+                "Fᵢ",
+                "Зона и решение",
+            ),
+            blank.columns,
+        )
+        assertEquals(0x2116, blank.columns.first().single().code)
+        assertEquals(0x1D62, blank.columns[3][1].code)
+        assertEquals(0x2013, '–'.code)
+        assertTrue(blank.columns[6].contains('–'))
+        assertEquals(listOf("Итого"), blank.rowLabels)
+        assertEquals(listOf("Итого", "100%", "Sср =", "Строк с Fᵢ ≥ 2:"), blank.totalLabels)
+        assertEquals(0x0053, blank.totalLabels[2][0].code)
+        assertEquals(0x0441, blank.totalLabels[2][1].code)
+        assertEquals(
+            "Балл трения Rᵢ ставится по телу: вспомнить последний звонок от этого источника. Если хочется отложить телефон и не брать — балл не ниже семи.",
+            blank.notes.single(),
+        )
+        assertEquals(0x2014, blank.notes.single().first { it == '—' }.code)
+    }
+
+    @Test
+    fun workMatchesJournalHeadingQuadrantsAndControlRule() {
+        val blank = BlankCanon.work
+        assertEquals("Бланк 3н. Дела участка", blank.title)
+        assertEquals(
+            listOf(
+                "Дело",
+                "Dᵢ, % результата",
+                "Часы в месяц и hᵢ, %",
+                "Rᵢ, 1–10",
+                "Dᵢ / hᵢ",
+                "Fᵢ = (Rᵢ × hᵢ) / (5 × Dᵢ)",
+                "Пометка",
+                "Квадрант и решение",
+            ),
+            blank.columns,
+        )
+        assertEquals(0x00D7, blank.columns[5].first { it == '×' }.code)
+        val table = blank.referenceTables.single()
+        assertEquals("Квадранты", table.title)
+        assertEquals(listOf("", "Rᵢ ≤ 5", "Rᵢ ≥ 6"), table.header)
+        assertEquals(0x2264, table.header[1].first { it == '≤' }.code)
+        assertEquals(0x2265, table.header[2].first { it == '≥' }.code)
+        assertEquals(
+            listOf(
+                listOf(
+                    "Dᵢ / hᵢ ≥ 1",
+                    "I. Ядро: оберегать и добавлять часы",
+                    "II. Точка роста: снимать трение регламентом",
+                ),
+                listOf(
+                    "Dᵢ / hᵢ < 1",
+                    "III. Обязательная гигиена: держать в рамках по времени",
+                    "IV. Трение: отдать инструменту, передать или отсечь",
+                ),
+            ),
+            table.rows,
+        )
+        assertEquals('<', table.rows[1][0].first { it == '<' })
+        assertEquals(listOf("Итого", "100%"), blank.totalLabels)
+        assertEquals(
+            "Контрольное правило: дело с Fᵢ ≥ 2 считается делом квадранта IV, даже если по ощущениям оно спокойное.",
+            blank.notes.single(),
+        )
+    }
+
     private fun texts(blank: BlankCanon): List<String> = buildList {
         add(blank.title)
         add(blank.entriesTitle)
         addAll(blank.columns)
+        addAll(blank.notes)
+        addAll(blank.rowLabels)
+        addAll(blank.totalLabels)
         blank.referenceTables.forEach { table ->
             table.title?.let(::add)
             addAll(table.header)

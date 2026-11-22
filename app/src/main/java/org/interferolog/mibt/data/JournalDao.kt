@@ -99,6 +99,12 @@ interface JournalDao {
     @Insert
     suspend fun insertSpend(entry: SpendEntryEntity): Long
 
+    @Query("DELETE FROM spends WHERE id = :id")
+    suspend fun deleteSpend(id: Long)
+
+    @Query("DELETE FROM mirror_bills WHERE spendEntryId = :spendId")
+    suspend fun deleteBillsForSpend(spendId: Long)
+
     @Query("SELECT * FROM spends WHERE cycleId = :cycleId ORDER BY atMillis DESC")
     fun observeSpends(cycleId: Long): Flow<List<SpendEntryEntity>>
 
@@ -120,6 +126,9 @@ interface JournalDao {
     @Insert
     suspend fun insertSource(source: IncomeSourceEntity)
 
+    @Update
+    suspend fun updateSource(source: IncomeSourceEntity)
+
     @Query("DELETE FROM income_sources WHERE id = :id")
     suspend fun deleteSource(id: Long)
 
@@ -140,6 +149,12 @@ interface JournalDao {
 
     @Insert
     suspend fun insertWork(item: WorkItemEntity)
+
+    @Update
+    suspend fun updateWork(item: WorkItemEntity)
+
+    @Query("DELETE FROM work_items WHERE id = :id")
+    suspend fun deleteWork(id: Long)
 
     @Query("SELECT * FROM work_items WHERE cycleId = :cycleId ORDER BY id")
     fun observeWork(cycleId: Long): Flow<List<WorkItemEntity>>

@@ -38,8 +38,8 @@ import androidx.room.RoomDatabase
         MarkerCheckEntity::class,
         ReminderPlanEntity::class,
     ],
-    version = 1,
-    exportSchema = false,
+    version = 2,
+    exportSchema = true,
 )
 abstract class MibtDatabase : RoomDatabase() {
     abstract fun journal(): JournalDao
@@ -53,7 +53,7 @@ abstract class MibtDatabase : RoomDatabase() {
                     context.applicationContext,
                     MibtDatabase::class.java,
                     "mibt.db",
-                ).build().also { instance = it }
+                ).addMigrations(MIGRATION_1_2).build().also { instance = it }
             }
         }
     }

@@ -3,6 +3,7 @@
 
 package org.interferolog.mibt.domain
 
+import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.round
 
@@ -36,4 +37,19 @@ fun formatRatio(ratio: Double): String {
 fun formatHours(hours: Double): String {
     val rounded = round(hours * 10.0) / 10.0
     return if (rounded % 1.0 == 0.0) rounded.toInt().toString() else "%.1f".format(rounded)
+}
+
+fun formatPoints(points: Double): String {
+    val rounded = round(points * 10.0) / 10.0
+    val text = if (rounded % 1.0 == 0.0) rounded.toInt().toString() else "%.1f".format(Locale.US, rounded)
+    return "$text%"
+}
+
+fun formatIndex(index: Double): String = "%.2f".format(Locale.US, index)
+
+fun formatPerHour(kopecksPerHour: Double): String = "${formatRubles(kopecksPerHour.toLong())}/ч"
+
+fun formatYield(ratio: Double): String {
+    val rounded = round(ratio * 100.0) / 100.0
+    return if (rounded % 1.0 == 0.0) rounded.toInt().toString() else "%.2f".format(Locale.US, rounded)
 }

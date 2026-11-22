@@ -27,6 +27,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -689,6 +690,16 @@ fun RemoveButton(text: String, enabled: Boolean = true, onClick: () -> Unit) {
         border = BorderStroke(1.dp, error),
     ) {
         Text(text)
+    }
+}
+
+@Composable
+fun EditIconButton(contentDescription: String, onClick: () -> Unit) {
+    IconButton(onClick = onClick) {
+        Icon(
+            Icons.Outlined.Edit,
+            contentDescription = contentDescription,
+        )
     }
 }
 

@@ -37,6 +37,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
 import org.interferolog.mibt.JournalViewModel
+import org.interferolog.mibt.content.BlankCanon
 import org.interferolog.mibt.content.CALC_DISCLAIMER
 import org.interferolog.mibt.content.JournalCanon
 import org.interferolog.mibt.data.ClusterPersonEntity
@@ -50,13 +51,12 @@ import org.interferolog.mibt.data.PassportDraft
 import org.interferolog.mibt.data.PositionDraft
 import org.interferolog.mibt.data.RestDraft
 import org.interferolog.mibt.data.RingDraft
+import org.interferolog.mibt.data.HourLogEntity
 import org.interferolog.mibt.data.WorkItemEntity
 import org.interferolog.mibt.data.toDraft
 import org.interferolog.mibt.domain.Circle
 import org.interferolog.mibt.domain.DebtInput
 import org.interferolog.mibt.domain.DebtStrategy
-import org.interferolog.mibt.domain.FiZone
-import org.interferolog.mibt.domain.Quadrant
 import org.interferolog.mibt.domain.amortize
 import org.interferolog.mibt.domain.carryingMinimum
 import org.interferolog.mibt.domain.circleLabel
@@ -66,15 +66,24 @@ import org.interferolog.mibt.domain.echelonHours
 import org.interferolog.mibt.domain.familyRemainder
 import org.interferolog.mibt.domain.fiZone
 import org.interferolog.mibt.domain.fiZoneLabel
+import org.interferolog.mibt.domain.SourceInput
+import org.interferolog.mibt.domain.WorkInput
 import org.interferolog.mibt.domain.formatHours
+import org.interferolog.mibt.domain.formatIndex
+import org.interferolog.mibt.domain.formatPerHour
+import org.interferolog.mibt.domain.formatPoints
 import org.interferolog.mibt.domain.formatRubles
+import org.interferolog.mibt.domain.formatYield
 import org.interferolog.mibt.domain.futureValue
-import org.interferolog.mibt.domain.hourlyRate
+import org.interferolog.mibt.domain.index
+import org.interferolog.mibt.domain.rate
+import org.interferolog.mibt.domain.sourceTotals
+import org.interferolog.mibt.domain.withDecision
+import org.interferolog.mibt.domain.workTotals
 import org.interferolog.mibt.domain.parseRubles
 import org.interferolog.mibt.domain.profileMonths
 import org.interferolog.mibt.domain.quadrant
 import org.interferolog.mibt.domain.quadrantLabel
-import org.interferolog.mibt.domain.resistanceByShares
 import org.interferolog.mibt.domain.runwayMonths
 import org.interferolog.mibt.domain.runwayZone
 import org.interferolog.mibt.domain.splitCoupon
@@ -83,19 +92,7 @@ import org.interferolog.mibt.domain.weeklyTrancheRemainder
 import java.io.File
 import java.time.LocalDate
 import java.time.ZoneId
-
-private fun fiTone(zone: FiZone): CardTone = when (zone) {
-    FiZone.GREEN -> CardTone.Primary
-    FiZone.YELLOW -> CardTone.Tertiary
-    FiZone.RED -> CardTone.Error
-}
-
-private fun quadrantTone(q: Quadrant): CardTone = when (q) {
-    Quadrant.CORE -> CardTone.Primary
-    Quadrant.GROWTH_POINT -> CardTone.Secondary
-    Quadrant.HYGIENE -> CardTone.Tertiary
-    Quadrant.FRICTION -> CardTone.Error
-}
+import java.time.format.DateTimeFormatter
 
 private fun circleTone(circle: Circle): CardTone = when (circle) {
     Circle.UPPER -> CardTone.Primary
@@ -126,39 +123,27 @@ fun SourcesScreen(viewModel: JournalViewModel) {
     var dShare by remember { mutableStateOf("") }
     var hShare by remember { mutableStateOf("") }
     var score by remember { mutableIntStateOf(5) }
+    var decision by remember { mutableStateOf("") }
+    var editingId by remember { mutableStateOf<Long?>(null) }
+    val blank = BlankCanon.sources
+
+    fun clearForm() {
+        editingId = null
+        name = ""
+        income = ""
+        noise = ""
+        contract = ""
+        friction = ""
+        dShare = ""
+        hShare = ""
+        score = 5
+        decision = ""
+    }
 
     ScreenColumn {
-        if (ui.sources.isNotEmpty()) {
-            SectionHeader("Источники дохода")
-            SegmentedGroup(count = ui.sources.size) { index, shape ->
-                val source = ui.sources[index]
-                val rate = hourlyRate(
-                    source.netIncomeKopecks,
-                    source.compensatoryNoiseKopecks,
-                    source.contractHours,
-                    source.frictionHours,
-                )
-                val fi = resistanceByShares(source.frictionScore, source.hoursShare, source.incomeShare)
-                val zone = fi?.let(::fiZone)
-                ListItem(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(shape),
-                    supportingContent = {
-                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text("S: ${rate?.let { "${formatRubles(it.toLong())}/ч" } ?: "—"} · Fᵢ: ${fi?.let { "%.2f".format(it) } ?: "—"}")
-                            if (zone != null) ToneBadge(fiZoneLabel(zone), fiTone(zone))
-                        }
-                    },
-                    trailingContent = {
-                        DeleteIconButton("Убрать ${source.name}") { viewModel.deleteSource(source.id) }
-                    },
-                    colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-                    content = { Text(source.name, style = MaterialTheme.typography.titleMedium) },
-                )
-            }
-        }
-        SectionHeader("Новый источник")
+        BlankHeader(blank)
+        blank.notes.forEach { QuietCard(it, CardTone.Secondary) }
+        SectionHeader(if (editingId == null) "Новый источник" else "Источник")
         SectionCard {
             Field("Источник", name, { name = it })
             Field("Чистый доход", income, { income = it }, number = true, suffix = "₽")
@@ -168,9 +153,11 @@ fun SourcesScreen(viewModel: JournalViewModel) {
             Field("Dᵢ, доля дохода", dShare, { dShare = it }, number = true, suffix = "%")
             Field("hᵢ, доля часов", hShare, { hShare = it }, number = true, suffix = "%")
             ScaleSlider("Rᵢ, сопротивление", score, { score = it })
-            CommitButton("Добавить источник") {
+            Field("Решение", decision, { decision = it }, singleLine = false)
+            CommitButton(if (editingId == null) "Добавить источник" else "Сохранить") {
                 viewModel.saveSource(
                     IncomeSourceEntity(
+                        id = editingId ?: 0,
                         cycleId = cycleId,
                         name = name.ifBlank { "Источник" },
                         netIncomeKopecks = parseRubles(income) ?: 0,
@@ -180,17 +167,38 @@ fun SourcesScreen(viewModel: JournalViewModel) {
                         incomeShare = dShare.toDoubleOrNull() ?: 0.0,
                         hoursShare = hShare.toDoubleOrNull() ?: 0.0,
                         frictionScore = score,
+                        decision = decision.trim(),
                     ),
                 )
-                name = ""
-                income = ""
-                noise = ""
-                contract = ""
-                friction = ""
-                dShare = ""
-                hShare = ""
-                score = 5
+                clearForm()
             }
+            if (editingId != null) {
+                TonalButton("Отмена", modifier = Modifier.fillMaxWidth()) { clearForm() }
+            }
+        }
+        val rows = ui.sources.map { it.toInput() }
+        EntryList(
+            columns = blank.columns,
+            entries = ui.sources.mapIndexed { index, source ->
+                EntryLine(source.id, sourceCells(index, source.toInput(), source.name, source.decision))
+            },
+            onDelete = viewModel::deleteSource,
+            onEdit = { id ->
+                val source = ui.sources.firstOrNull { it.id == id } ?: return@EntryList
+                editingId = source.id
+                name = source.name
+                income = rublesField(source.netIncomeKopecks)
+                noise = rublesField(source.compensatoryNoiseKopecks)
+                contract = numberField(source.contractHours)
+                friction = numberField(source.frictionHours)
+                dShare = numberField(source.incomeShare)
+                hShare = numberField(source.hoursShare)
+                score = source.frictionScore
+                decision = source.decision
+            },
+        )
+        if (rows.isNotEmpty()) {
+            ColumnCard(blank.rowLabels.single(), blank.columns, sourceTotalCells(blank, rows))
         }
     }
 }
@@ -329,10 +337,27 @@ fun WorkScreen(viewModel: JournalViewModel) {
     var share by remember { mutableStateOf("") }
     var score by remember { mutableIntStateOf(5) }
     var mark by remember { mutableStateOf("FRICTION") }
+    var decision by remember { mutableStateOf("") }
+    var editingId by remember { mutableStateOf<Long?>(null) }
     var day by remember { mutableStateOf(LocalDate.now().toString()) }
     var dayHours by remember { mutableStateOf("") }
+    val blank = BlankCanon.work
+
+    fun clearForm() {
+        editingId = null
+        name = ""
+        result = ""
+        hours = ""
+        share = ""
+        score = 5
+        mark = "FRICTION"
+        decision = ""
+    }
 
     ScreenColumn {
+        BlankHeader(blank)
+        blank.referenceTables.forEach { ReferenceTable(it) }
+        blank.notes.forEach { QuietCard(it, CardTone.Secondary) }
         SectionHeader(
             title = "Учёт часов",
             subtitle = "Записано дней с часами: ${ui.hours.map { it.day }.toSet().size} из 14.",
@@ -345,32 +370,14 @@ fun WorkScreen(viewModel: JournalViewModel) {
                 dayHours = ""
             }
         }
-
-        SectionHeader("Дела участка")
-        if (ui.work.isNotEmpty()) {
-            SegmentedGroup(count = ui.work.size) { index, shape ->
-                val item = ui.work[index]
-                val yield = if (item.hoursShare == 0.0) 0.0 else item.resultShare / item.hoursShare
-                val fi = resistanceByShares(item.frictionScore, item.hoursShare, item.resultShare) ?: 0.0
-                val q = quadrant(yield, item.frictionScore, fi)
-                ListItem(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(shape),
-                    supportingContent = {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            ToneBadge(quadrantLabel(q), quadrantTone(q))
-                            MetaText("Fᵢ ${"%.2f".format(fi)}")
-                        }
-                    },
-                    colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-                    content = { Text(item.name, style = MaterialTheme.typography.titleMedium) },
-                )
-            }
+        ui.hours.sortedBy { it.day }.forEach { entry ->
+            ColumnCard(
+                title = formatLoggedDay(entry.day),
+                columns = hourColumns(entry),
+                cells = hourCells(entry),
+            )
         }
+        SectionHeader(if (editingId == null) "Дело" else name.ifBlank { "Дело" })
         SectionCard {
             Field("Дело", name, { name = it })
             Field("Dᵢ, доля результата", result, { result = it }, number = true, suffix = "%")
@@ -382,31 +389,157 @@ fun WorkScreen(viewModel: JournalViewModel) {
                 selected = mark,
                 onSelect = { mark = it },
             )
-            TonalButton(
-                text = "Добавить дело",
-                modifier = Modifier.fillMaxWidth(),
-                onClick = {
-                    viewModel.saveWork(
-                        WorkItemEntity(
-                            cycleId = cycleId,
-                            name = name.ifBlank { "Дело" },
-                            resultShare = result.toDoubleOrNull() ?: 0.0,
-                            hours = hours.toDoubleOrNull() ?: 0.0,
-                            hoursShare = share.toDoubleOrNull() ?: 0.0,
-                            frictionScore = score,
-                            mark = mark,
-                        ),
-                    )
-                    name = ""
-                    result = ""
-                    hours = ""
-                    share = ""
-                    score = 5
-                },
-            )
+            Field("Решение", decision, { decision = it }, singleLine = false)
+            CommitButton(if (editingId == null) "Добавить дело" else "Сохранить") {
+                viewModel.saveWork(
+                    WorkItemEntity(
+                        id = editingId ?: 0,
+                        cycleId = cycleId,
+                        name = name.ifBlank { "Дело" },
+                        resultShare = result.toDoubleOrNull() ?: 0.0,
+                        hours = hours.toDoubleOrNull() ?: 0.0,
+                        hoursShare = share.toDoubleOrNull() ?: 0.0,
+                        frictionScore = score,
+                        mark = mark,
+                        decision = decision.trim(),
+                    ),
+                )
+                clearForm()
+            }
+            if (editingId != null) {
+                TonalButton("Отмена", modifier = Modifier.fillMaxWidth()) { clearForm() }
+            }
+        }
+        val rows = ui.work.map { it.toInput() }
+        EntryList(
+            columns = blank.columns,
+            entries = ui.work.map { item ->
+                EntryLine(item.id, workCells(item.toInput(), item.name, item.mark, item.decision))
+            },
+            onDelete = viewModel::deleteWork,
+            onEdit = { id ->
+                val item = ui.work.firstOrNull { it.id == id } ?: return@EntryList
+                editingId = item.id
+                name = item.name
+                result = numberField(item.resultShare)
+                hours = numberField(item.hours)
+                share = numberField(item.hoursShare)
+                score = item.frictionScore
+                mark = item.mark
+                decision = item.decision
+            },
+        )
+        if (rows.isNotEmpty()) {
+            ColumnCard(blank.rowLabels.single(), blank.columns, workTotalCells(blank, rows))
         }
     }
 }
+
+private fun IncomeSourceEntity.toInput() = SourceInput(
+    netIncomeKopecks = netIncomeKopecks,
+    compensatoryNoiseKopecks = compensatoryNoiseKopecks,
+    contractHours = contractHours,
+    frictionHours = frictionHours,
+    incomeShare = incomeShare,
+    hoursShare = hoursShare,
+    frictionScore = frictionScore,
+)
+
+private fun sourceCells(index: Int, source: SourceInput, name: String, decision: String): List<String> {
+    val zone = source.index()?.let { fiZoneLabel(fiZone(it)) } ?: "—"
+    return listOf(
+        (index + 1).toString(),
+        name.ifBlank { "—" },
+        formatRubles(source.netIncomeKopecks),
+        formatPoints(source.incomeShare),
+        hoursAndShare(source.contractHours + source.frictionHours, source.hoursShare),
+        source.rate()?.let(::formatPerHour) ?: "—",
+        source.frictionScore.toString(),
+        source.index()?.let(::formatIndex) ?: "—",
+        withDecision(zone, decision),
+    )
+}
+
+private fun sourceTotalCells(blank: BlankCanon, rows: List<SourceInput>): List<String> {
+    val total = sourceTotals(rows)
+    return listOf(
+        blank.totalLabels[0],
+        "—",
+        formatRubles(total.netIncomeKopecks),
+        printedShare(total.incomeShare, blank.totalLabels[1]),
+        hoursAndShare(total.hours, total.hoursShare),
+        total.averageRateKopecks?.let { "${blank.totalLabels[2]} ${formatPerHour(it)}" }
+            ?: "${blank.totalLabels[2]} —",
+        "—",
+        "${blank.totalLabels[3]} ${total.rowsAtLeastTwo}",
+        "—",
+    )
+}
+
+private fun WorkItemEntity.toInput() = WorkInput(
+    resultShare = resultShare,
+    hours = hours,
+    hoursShare = hoursShare,
+    frictionScore = frictionScore,
+)
+
+private fun workCells(item: WorkInput, name: String, mark: String, decision: String): List<String> {
+    val place = quadrant(item.yieldRatio, item.frictionScore, item.index)
+    return listOf(
+        name.ifBlank { "—" },
+        formatPoints(item.resultShare),
+        hoursAndShare(item.hours, item.hoursShare),
+        item.frictionScore.toString(),
+        formatYield(item.yieldRatio),
+        formatIndex(item.index),
+        markLabel(mark),
+        withDecision(quadrantLabel(place), decision),
+    )
+}
+
+private fun workTotalCells(blank: BlankCanon, rows: List<WorkInput>): List<String> {
+    val total = workTotals(rows)
+    return listOf(
+        blank.totalLabels[0],
+        printedShare(total.resultShare, blank.totalLabels[1]),
+        hoursAndShare(total.hours, total.hoursShare),
+        "—",
+        "—",
+        "—",
+        "—",
+        "—",
+    )
+}
+
+private fun hoursAndShare(hours: Double, share: Double): String =
+    "${formatHours(hours)} ч, ${formatPoints(share)}"
+
+private fun printedShare(points: Double, printedHundred: String): String {
+    val actual = formatPoints(points)
+    return if (actual == printedHundred) printedHundred else actual
+}
+
+private fun markLabel(mark: String): String = when (mark) {
+    "CREATE" -> "Созидание"
+    "FRICTION" -> "Трение"
+    else -> mark
+}
+
+private fun rublesField(kopecks: Long): String = formatRubles(kopecks).removeSuffix(" ₽")
+
+private fun numberField(value: Double): String =
+    if (value % 1.0 == 0.0) value.toLong().toString() else value.toString()
+
+private val loggedDay: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy")
+
+private fun formatLoggedDay(iso: String): String =
+    runCatching { LocalDate.parse(iso).format(loggedDay) }.getOrDefault(iso)
+
+private fun hourColumns(entry: HourLogEntity): List<String> =
+    if (entry.note.isBlank()) listOf("Часы за день") else listOf("Часы за день", "Заметка")
+
+private fun hourCells(entry: HourLogEntity): List<String> =
+    if (entry.note.isBlank()) listOf("${formatHours(entry.hours)} ч") else listOf("${formatHours(entry.hours)} ч", entry.note)
 
 @Composable
 fun FamilyScreen(viewModel: JournalViewModel) {

@@ -20,6 +20,9 @@ data class BlankCanon(
     val columns: List<String>,
     val examples: List<List<String>>,
     val entriesTitle: String,
+    val notes: List<String> = emptyList(),
+    val rowLabels: List<String> = emptyList(),
+    val totalLabels: List<String> = emptyList(),
 ) {
     companion object {
         val phaseDiary = BlankCanon(
@@ -147,6 +150,101 @@ data class BlankCanon(
             ),
         )
 
-        val all: List<BlankCanon> = listOf(phaseDiary, pointC)
+        val holter = BlankCanon(
+            number = "2",
+            title = "Бланк 2. Холтер четырёх узлов",
+            referenceTables = emptyList(),
+            columns = listOf(
+                "Дата",
+                "Доход; Обз отдельно",
+                "U₁ Опора",
+                "U₂ Инструмент",
+                "U₃ Рост",
+                "U₄ Шум",
+                "Двойной тариф",
+                "η",
+            ),
+            examples = emptyList(),
+            entriesTitle = "",
+            notes = listOf(
+                "Правило пропусков: если вечер пропущен, примерная сумма вписывается в U₄, и запись спокойно продолжается с сегодняшнего вечера. Холтер из-за пропуска не бросается.",
+            ),
+            rowLabels = listOf(
+                "День 1",
+                "День 2",
+                "День 3",
+                "День 4",
+                "День 5",
+                "День 6",
+                "День 7",
+                "Итого за неделю",
+            ),
+        )
+
+        val sources = BlankCanon(
+            number = "3",
+            title = "Бланк 3. Индекс сопротивления источников",
+            referenceTables = emptyList(),
+            columns = listOf(
+                "№",
+                "Источник",
+                "Чистый доход за месяц",
+                "Dᵢ, % дохода",
+                "Часы и hᵢ, % часов",
+                "Sᵢ, ₽/ч",
+                "Rᵢ, 1–10",
+                "Fᵢ",
+                "Зона и решение",
+            ),
+            examples = emptyList(),
+            entriesTitle = "",
+            notes = listOf(
+                "Балл трения Rᵢ ставится по телу: вспомнить последний звонок от этого источника. Если хочется отложить телефон и не брать — балл не ниже семи.",
+            ),
+            rowLabels = listOf("Итого"),
+            totalLabels = listOf("Итого", "100%", "Sср =", "Строк с Fᵢ ≥ 2:"),
+        )
+
+        val work = BlankCanon(
+            number = "3н",
+            title = "Бланк 3н. Дела участка",
+            referenceTables = listOf(
+                ReferenceTable(
+                    title = "Квадранты",
+                    header = listOf("", "Rᵢ ≤ 5", "Rᵢ ≥ 6"),
+                    rows = listOf(
+                        listOf(
+                            "Dᵢ / hᵢ ≥ 1",
+                            "I. Ядро: оберегать и добавлять часы",
+                            "II. Точка роста: снимать трение регламентом",
+                        ),
+                        listOf(
+                            "Dᵢ / hᵢ < 1",
+                            "III. Обязательная гигиена: держать в рамках по времени",
+                            "IV. Трение: отдать инструменту, передать или отсечь",
+                        ),
+                    ),
+                ),
+            ),
+            columns = listOf(
+                "Дело",
+                "Dᵢ, % результата",
+                "Часы в месяц и hᵢ, %",
+                "Rᵢ, 1–10",
+                "Dᵢ / hᵢ",
+                "Fᵢ = (Rᵢ × hᵢ) / (5 × Dᵢ)",
+                "Пометка",
+                "Квадрант и решение",
+            ),
+            examples = emptyList(),
+            entriesTitle = "",
+            notes = listOf(
+                "Контрольное правило: дело с Fᵢ ≥ 2 считается делом квадранта IV, даже если по ощущениям оно спокойное.",
+            ),
+            rowLabels = listOf("Итого"),
+            totalLabels = listOf("Итого", "100%"),
+        )
+
+        val all: List<BlankCanon> = listOf(phaseDiary, pointC, holter, sources, work)
     }
 }

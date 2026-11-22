@@ -91,6 +91,7 @@ fun EntryList(
     entries: List<EntryLine>,
     onDelete: (Long) -> Unit,
     modifier: Modifier = Modifier,
+    onEdit: ((Long) -> Unit)? = null,
 ) {
     var pendingId by remember { mutableStateOf<Long?>(null) }
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -111,6 +112,9 @@ fun EntryList(
                         columns.zip(entry.cells).forEach { (label, cell) ->
                             FieldLine(label, cell, secondary = false)
                         }
+                    }
+                    if (onEdit != null) {
+                        EditIconButton("Править") { onEdit(entry.id) }
                     }
                     DeleteIconButton("Убрать запись") { pendingId = entry.id }
                 }
@@ -136,6 +140,21 @@ fun EntryList(
                 TextButton(onClick = { pendingId = null }) { Text("Оставить") }
             },
         )
+    }
+}
+
+@Composable
+fun ColumnCard(
+    title: String,
+    columns: List<String>,
+    cells: List<String>,
+    modifier: Modifier = Modifier,
+) {
+    SectionCard(modifier = modifier) {
+        Text(title, style = MaterialTheme.typography.titleMedium)
+        columns.zip(cells).forEach { (label, cell) ->
+            FieldLine(label, cell, secondary = false)
+        }
     }
 }
 
