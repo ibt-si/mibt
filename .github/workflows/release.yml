@@ -156,11 +156,7 @@ jobs:
           (cd "$SIGNING_DIR" && sha256sum "$apk_name" > "$apk_name.sha256")
 
           cat > "$SIGNING_DIR/release-notes.md" <<EOF
-          MiBT ${VERSION_NAME} (versionCode ${VERSION_CODE})
-
           - [Скачать APK](https://github.com/${REPOSITORY}/releases/download/${TAG}/${apk_name})
-          - Checksum: \`$apk_name.sha256\` (SHA-256)
-          - Commit: \`${GITHUB_SHA}\`
           EOF
 
           echo "apk=$SIGNING_DIR/$apk_name" >> "$GITHUB_OUTPUT"
@@ -172,7 +168,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.version.outputs.tag }}
-          TITLE: MiBT ${{ steps.version.outputs.name }} (${{ steps.version.outputs.code }})
+          TITLE: MiBT ${{ steps.version.outputs.name }}
           EXISTS: ${{ steps.check.outputs.exists }}
           APK: ${{ steps.package.outputs.apk }}
           CHECKSUM: ${{ steps.package.outputs.checksum }}
