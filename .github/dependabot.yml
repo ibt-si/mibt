@@ -1,0 +1,44 @@
+# Dependabot version updates.
+#
+# Gradle dependencies and plugins are all declared in gradle/libs.versions.toml,
+# which Dependabot reads when the package ecosystem is configured at the repo root.
+# GitHub Actions are pinned with `uses: owner/action@version`, so they are kept
+# up to date separately.
+
+version: 2
+updates:
+  - package-ecosystem: "gradle"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+    groups:
+      # AndroidX artifacts are released in batches, so bundle their low-risk updates.
+      androidX:
+        patterns:
+          - "androidx.*"
+        update-types:
+          - "minor"
+          - "patch"
+      # Kotlin, the Compose compiler plugin and KSP have to move together.
+      kotlin:
+        patterns:
+          - "org.jetbrains.kotlin*"
+          - "com.google.devtools.ksp*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci"
+      include: "scope"
