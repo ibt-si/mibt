@@ -29,6 +29,8 @@ class BlankCanonTest {
                     assertEquals(table.header.size, row.size)
                 }
             }
+            assertTrue(blank.entriesTitle.isNotEmpty())
+            assertFalse(blank.entriesTitle.endsWith(":"))
             assertTrue(blank.examples.isNotEmpty())
             blank.examples.forEach { row ->
                 assertEquals(blank.columns.size, row.size)
@@ -51,6 +53,7 @@ class BlankCanonTest {
     fun phaseDiaryMatchesJournalHeadingAndTables() {
         val blank = BlankCanon.phaseDiary
         assertEquals("Бланк 1. Дневник фазы", blank.title)
+        assertEquals("Дневник", blank.entriesTitle)
         assertEquals(
             listOf(
                 "Дата и время",
@@ -122,6 +125,7 @@ class BlankCanonTest {
     fun pointCMatchesJournalHeadingAndTables() {
         val blank = BlankCanon.pointC
         assertEquals("Бланк 2а. Колодец или Точка C", blank.title)
+        assertEquals("Журнал спазмов", blank.entriesTitle)
         assertEquals(0x43, blank.title.last().code)
         assertEquals(
             listOf(
@@ -183,6 +187,7 @@ class BlankCanonTest {
 
     private fun texts(blank: BlankCanon): List<String> = buildList {
         add(blank.title)
+        add(blank.entriesTitle)
         addAll(blank.columns)
         blank.referenceTables.forEach { table ->
             table.title?.let(::add)

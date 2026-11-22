@@ -19,6 +19,7 @@ data class BlankCanon(
     val referenceTables: List<ReferenceTable>,
     val columns: List<String>,
     val examples: List<List<String>>,
+    val entriesTitle: String,
 ) {
     companion object {
         val phaseDiary = BlankCanon(
@@ -68,6 +69,7 @@ data class BlankCanon(
                 "Метка: П (пустота) / Н (наполненность)",
                 "Факт без оценки",
             ),
+            entriesTitle = "Дневник",
             examples = listOf(
                 listOf(
                     "Пример: пн, 23:10",
@@ -133,6 +135,7 @@ data class BlankCanon(
                 "Спазм: анестезия / паралич / демпинг / отсечка масштаба",
                 "Что изменила пауза",
             ),
+            entriesTitle = "Журнал спазмов",
             examples = listOf(
                 listOf(
                     "Пример",
