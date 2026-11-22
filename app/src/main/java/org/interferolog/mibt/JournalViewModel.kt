@@ -18,7 +18,6 @@ import org.interferolog.mibt.data.DebtEntity
 import org.interferolog.mibt.data.FamilyPlanEntity
 import org.interferolog.mibt.data.FanBranchEntity
 import org.interferolog.mibt.data.FanChannelEntity
-import org.interferolog.mibt.data.MibtDatabase
 import org.interferolog.mibt.data.HourLogEntity
 import org.interferolog.mibt.data.IncomeSourceEntity
 import org.interferolog.mibt.data.InvestmentPassportEntity
@@ -27,6 +26,7 @@ import org.interferolog.mibt.data.JournalUi
 import org.interferolog.mibt.data.MaintenanceLogEntity
 import org.interferolog.mibt.data.MarkerCheckEntity
 import org.interferolog.mibt.data.MeaningRingEntity
+import org.interferolog.mibt.data.MibtDatabase
 import org.interferolog.mibt.data.MirrorBillEntity
 import org.interferolog.mibt.data.PhaseDiaryEntryEntity
 import org.interferolog.mibt.data.PositionAuditEntity
@@ -78,18 +78,28 @@ class JournalViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun confirmMarker(attemptId: Long) {
-        viewModelScope.launch { repo.confirmMarker(attemptId) }
+        viewModelScope.launch {
+            repo.confirmMarker(attemptId)
+            _notice.value = "Маркер готовности подтверждён."
+        }
     }
 
     fun repeatWeek(attempt: WeekAttemptEntity) {
-        viewModelScope.launch { repo.repeatWeek(attempt, System.currentTimeMillis()) }
+        viewModelScope.launch {
+            repo.repeatWeek(attempt, System.currentTimeMillis())
+            _notice.value = "Открыта повторная попытка недели."
+        }
     }
 
     fun advance(attempt: WeekAttemptEntity) {
         val cycle = ui.value.cycle ?: return
         viewModelScope.launch {
             val moved = repo.advance(cycle, attempt, System.currentTimeMillis())
-            if (!moved) _notice.value = "Сначала три письменных ответа и подтверждение маркера."
+            _notice.value = if (moved) {
+                "Неделя завершена."
+            } else {
+                "Сначала три письменных ответа и подтверждение маркера."
+            }
         }
     }
 
@@ -107,6 +117,7 @@ class JournalViewModel(app: Application) : AndroidViewModel(app) {
                     fact = fact,
                 ),
             )
+            _notice.value = "Пауза записана."
         }
     }
 
@@ -124,6 +135,7 @@ class JournalViewModel(app: Application) : AndroidViewModel(app) {
                     pauseEffect = effect,
                 ),
             )
+            _notice.value = "Запись Точки C сохранена."
         }
     }
 
@@ -131,20 +143,33 @@ class JournalViewModel(app: Application) : AndroidViewModel(app) {
         val cycle = ui.value.cycle ?: return
         viewModelScope.launch {
             val saved = repo.saveSpend(cycle.id, System.currentTimeMillis(), node, amount, note, cleanSheet, canFundMirror)
-            if (!saved) _notice.value = "Покупки не будет: на двойную цену сейчас нет."
+            _notice.value = if (saved) {
+                "Трата записана."
+            } else {
+                "Покупки не будет: на двойную цену сейчас нет."
+            }
         }
     }
 
     fun settleBill(bill: MirrorBillEntity) {
-        viewModelScope.launch { repo.settleBill(bill, System.currentTimeMillis()) }
+        viewModelScope.launch {
+            repo.settleBill(bill, System.currentTimeMillis())
+            _notice.value = "Зеркальный перевод отмечен."
+        }
     }
 
     fun saveSource(source: IncomeSourceEntity) {
-        viewModelScope.launch { repo.saveSource(source) }
+        viewModelScope.launch {
+            repo.saveSource(source)
+            _notice.value = "Источник добавлен."
+        }
     }
 
     fun deleteSource(id: Long) {
-        viewModelScope.launch { repo.deleteSource(id) }
+        viewModelScope.launch {
+            repo.deleteSource(id)
+            _notice.value = "Источник удалён."
+        }
     }
 
     fun saveRehearsal(path: String, silenceHeld: Boolean, outcome: String) {
@@ -159,49 +184,74 @@ class JournalViewModel(app: Application) : AndroidViewModel(app) {
                     createdAt = System.currentTimeMillis(),
                 ),
             )
+            _notice.value = "Дубль записан."
         }
     }
 
     fun saveWork(item: WorkItemEntity) {
-        viewModelScope.launch { repo.saveWork(item) }
+        viewModelScope.launch {
+            repo.saveWork(item)
+            _notice.value = "Дело добавлено."
+        }
     }
 
     fun saveHour(day: String, hours: Double, note: String) {
         val cycle = ui.value.cycle ?: return
-        viewModelScope.launch { repo.saveHour(HourLogEntity(cycleId = cycle.id, day = day, hours = hours, note = note)) }
+        viewModelScope.launch {
+            repo.saveHour(HourLogEntity(cycleId = cycle.id, day = day, hours = hours, note = note))
+            _notice.value = "Часы записаны."
+        }
     }
 
     fun saveFamily(plan: FamilyPlanEntity) {
-        viewModelScope.launch { repo.saveFamily(plan) }
+        viewModelScope.launch {
+            repo.saveFamily(plan)
+            _notice.value = "Контуры сохранены."
+        }
     }
 
     fun saveRest(rest: RestMassEntity) {
-        viewModelScope.launch { repo.saveRest(rest) }
+        viewModelScope.launch {
+            repo.saveRest(rest)
+            _notice.value = "Масса покоя сохранена."
+        }
     }
 
     fun saveDebt(debt: DebtEntity) {
-        viewModelScope.launch { repo.saveDebt(debt) }
+        viewModelScope.launch {
+            repo.saveDebt(debt)
+            _notice.value = "Обязательство добавлено."
+        }
     }
 
     fun deleteDebt(id: Long) {
-        viewModelScope.launch { repo.deleteDebt(id) }
+        viewModelScope.launch {
+            repo.deleteDebt(id)
+            _notice.value = "Обязательство удалено."
+        }
     }
 
     fun applyFirstCut(income: Long) {
         val cycle = ui.value.cycle ?: return
-        viewModelScope.launch { repo.applyFirstCut(cycle.id, income) }
+        viewModelScope.launch {
+            repo.applyFirstCut(cycle.id, income)
+            _notice.value = "Первое сечение добавлено к массе покоя."
+        }
     }
 
     fun withdraw(amount: Long) {
         val cycle = ui.value.cycle ?: return
         viewModelScope.launch {
             val blocked = repo.withdraw(cycle.id, amount, System.currentTimeMillis())
-            if (blocked != null) _notice.value = blocked
+            _notice.value = blocked ?: "Изъятие записано."
         }
     }
 
     fun saveCrisis(map: CrisisMapEntity) {
-        viewModelScope.launch { repo.saveCrisis(map) }
+        viewModelScope.launch {
+            repo.saveCrisis(map)
+            _notice.value = "Карта кризиса сохранена."
+        }
     }
 
     fun startQuarantine(kind: String, hours: Int, reason: String) {
@@ -217,6 +267,7 @@ class JournalViewModel(app: Application) : AndroidViewModel(app) {
                     reason = reason,
                 ),
             )
+            _notice.value = "Карантин на $hours ч запущен."
         }
     }
 
@@ -231,38 +282,61 @@ class JournalViewModel(app: Application) : AndroidViewModel(app) {
                     runwayMonths = runway,
                 ),
             )
+            _notice.value = "Транш записан."
         }
     }
 
     fun saveBranch(branch: FanBranchEntity) {
-        viewModelScope.launch { repo.saveBranch(branch) }
+        viewModelScope.launch {
+            repo.saveBranch(branch)
+            _notice.value = "Ветвь добавлена."
+        }
     }
 
     fun closeBranch(id: Long) {
         viewModelScope.launch {
             val closed = repo.closeBranch(id, System.currentTimeMillis())
-            if (!closed) _notice.value = "Горизонт тишины ещё не дошёл до даты ревизии."
+            _notice.value = if (closed) {
+                "Направление закрыто."
+            } else {
+                "Горизонт тишины ещё не дошёл до даты ревизии."
+            }
         }
     }
 
     fun saveChannel(channel: FanChannelEntity) {
-        viewModelScope.launch { repo.saveChannel(channel) }
+        viewModelScope.launch {
+            repo.saveChannel(channel)
+            _notice.value = "Канал добавлен."
+        }
     }
 
     fun savePassport(passport: InvestmentPassportEntity) {
-        viewModelScope.launch { repo.savePassport(passport) }
+        viewModelScope.launch {
+            repo.savePassport(passport)
+            _notice.value = "Паспорт сохранён."
+        }
     }
 
     fun savePerson(person: ClusterPersonEntity) {
-        viewModelScope.launch { repo.savePerson(person) }
+        viewModelScope.launch {
+            repo.savePerson(person)
+            _notice.value = "Человек добавлен в кластер."
+        }
     }
 
     fun savePosition(audit: PositionAuditEntity) {
-        viewModelScope.launch { repo.savePosition(audit) }
+        viewModelScope.launch {
+            repo.savePosition(audit)
+            _notice.value = "Сверка позиции сохранена."
+        }
     }
 
     fun saveRing(ring: MeaningRingEntity) {
-        viewModelScope.launch { repo.saveRing(ring) }
+        viewModelScope.launch {
+            repo.saveRing(ring)
+            _notice.value = "Кольцо записано."
+        }
     }
 
     fun logMaintenance(rhythm: String, note: String) {
@@ -276,6 +350,7 @@ class JournalViewModel(app: Application) : AndroidViewModel(app) {
                     note = note,
                 ),
             )
+            _notice.value = "Ритм отмечен."
         }
     }
 
@@ -290,6 +365,7 @@ class JournalViewModel(app: Application) : AndroidViewModel(app) {
                     atMillis = System.currentTimeMillis(),
                 ),
             )
+            _notice.value = "Маркер отмечен."
         }
     }
 
@@ -297,6 +373,7 @@ class JournalViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             repo.saveReminder(plan)
             ReminderScheduler.reschedule(getApplication())
+            _notice.value = "Напоминания сохранены."
         }
     }
 
@@ -312,6 +389,7 @@ class JournalViewModel(app: Application) : AndroidViewModel(app) {
             getApplication<Application>().contentResolver.openOutputStream(uri)?.use { stream ->
                 stream.write(text.toByteArray(Charsets.UTF_8))
             }
+            _notice.value = "Файл сохранён."
         }
     }
 }

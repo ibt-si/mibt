@@ -31,6 +31,18 @@ import kotlinx.serialization.Serializable
 @Serializable data object IntakeRoute : NavKey
 @Serializable data object GuideRoute : NavKey
 
+fun NavBackStack<NavKey>.switchTopLevel(route: NavKey) {
+    if (route == HomeRoute) {
+        while (size > 1) removeAt(size - 1)
+        if (isEmpty()) add(HomeRoute)
+        return
+    }
+    if (lastOrNull() == route) return
+    while (size > 1) removeAt(size - 1)
+    if (isEmpty()) add(HomeRoute)
+    add(route)
+}
+
 fun NavBackStack<NavKey>.reveal(route: NavKey) {
     val existing = indexOfLast { it == route }
     if (existing < 0) {
