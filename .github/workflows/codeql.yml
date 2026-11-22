@@ -1,0 +1,60 @@
+name: CodeQL
+
+# Advanced setup. Kotlin requires a build for CodeQL to extract source code,
+# so the sources are compiled with the Gradle wrapper between `init` and
+# `analyze`. GitHub-hosted runners already provide the Android SDK.
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+  schedule:
+    - cron: '27 4 * * 1' # weekly, Mondays
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analyze (java-kotlin)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: java-kotlin
+          build-mode: manual
+          # queries: security-extended # uncomment to widen query coverage
+
+      - name: Build Kotlin/Java sources
+        # A clean, uncached build guarantees kotlinc/javac really run, which is
+        # required for CodeQL to trace the compiler and extract the sources.
+        run: ./gradlew --no-daemon --no-build-cache clean assembleDebug
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: "/language:java-kotlin"
