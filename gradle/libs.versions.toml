@@ -13,6 +13,7 @@ lifecycle = "2.11.1"
 core = "1.19.1"
 serialization = "1.13.0"
 coroutines = "1.11.0"
+desugar = "2.1.5"
 junit = "4.13.2"
 
 [libraries]
@@ -34,6 +35,7 @@ glance-material3 = { module = "androidx.glance:glance-material3", version.ref = 
 core-ktx = { module = "androidx.core:core-ktx", version.ref = "core" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
+desugar-jdk-libs = { module = "com.android.tools:desugar_jdk_libs", version.ref = "desugar" }
 junit = { module = "junit:junit", version.ref = "junit" }
 
 [plugins]

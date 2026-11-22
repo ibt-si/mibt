@@ -1,6 +1,6 @@
 # MiBT — agent notes
 
-Single-module Android app (`:app`, namespace `org.interferolog.mibt`). Kotlin, Jetpack Compose, Navigation 3, Room, Glance widget. `minSdk 26`, `targetSdk 36`, `compileSdk 37`. JDK 21 required; the Gradle 9.6 wrapper is Unix-only (no `gradlew.bat`). SDK path is in git-ignored `local.properties` (`sdk.dir=/opt/sdk`).
+Single-module Android app (`:app`, namespace `org.interferolog.mibt`). Kotlin, Jetpack Compose, Navigation 3, Room, Glance widget. `minSdk 24`, `targetSdk 37`, `compileSdk 37` (Android 17). JDK 21 required; the Gradle 9.9.1 wrapper is Unix-only (no `gradlew.bat`). SDK path is in git-ignored `local.properties` (`sdk.dir=/opt/sdk`).
 
 ## Build & verify
 
@@ -17,6 +17,7 @@ Run from the repo root:
 ## Dependencies & conventions
 
 - All versions live in `gradle/libs.versions.toml`; declare libs via `libs.*` aliases in `app/build.gradle.kts`. Kotlin, Compose compiler and KSP versions must move together (Dependabot groups them).
+- Core library desugaring is on (`isCoreLibraryDesugaringEnabled` + `coreLibraryDesugaring(libs.desugar.jdk.libs)`); the app uses `java.time` throughout, so keep it while `minSdk < 26`. `minSdk 24` is the floor set by Material3 1.5 and Navigation 3 1.2 — going lower means downgrading those.
 - GPL-3.0-or-later: every `.kt` file starts with the copyright line and `// SPDX-License-Identifier: GPL-3.0-or-later`.
 - User-facing copy is Russian and lives as literals in Compose files and `content/JournalCanon.kt`, not in `res/values/strings.xml`.
 
@@ -34,7 +35,7 @@ Run from the repo root:
 - `data/` — Room entities, DAO, `JournalRepository`, telemetry export. One `MibtDatabase` singleton via `MibtDatabase.get(context)` (`mibt.db`, v1, `exportSchema = false`); no migrations yet.
 - `navigation/` — Navigation 3. Every `NavKey` route subclass must be registered in `MibtNav.kt`'s `navConfig` polymorphic serializer. `MainActivity` deep-link intent extra `"open"` accepts `"pause"` / `"pointc"`.
 - `JournalViewModel` (root) — `AndroidViewModel` exposing one `ui` StateFlow from the repository; all writes go through its coroutine-launching methods.
-- `reminder/` — silent Point C reminders and `BOOT_COMPLETED` receiver; `widget/` — Glance "3-second pause" widget. `MibtApplication` creates the `point-c` notification channel and reschedules reminders at startup.
+- `reminder/` — silent Point C reminders and `BOOT_COMPLETED` receiver; `widget/` — Glance "3-second pause" widget. `MibtApplication` creates the `point-c` notification channel on API 26+ and reschedules reminders at startup.
 
 ## Releases
 

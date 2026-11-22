@@ -119,7 +119,7 @@ The specification of the digital log is part of the book’s “Flight log”.
 ## Stack
 
 - Language: Kotlin
-- Platform: Android, `minSdk` 26
+- Platform: Android, `minSdk` 24 (API 24+), `targetSdk`/`compileSdk` 37
 - UI: Jetpack Compose (Compose UI, Material 3 Expressive), Navigation 3
 - Persistence: Room
 - Widget: Jetpack Glance 1.2.0 (home-screen widget “3-second pause”)
@@ -161,7 +161,7 @@ The app also has three silent daily Point C reminders and a Markdown telemetry e
 
 ## Build and run
 
-JDK 21 is required. From the repository root:
+JDK 21 is required. Core library desugaring is enabled so `java.time` works on API 24–25. From the repository root:
 
 ```bash
 ./gradlew assembleDebug
@@ -323,7 +323,7 @@ Android-приложение к книге Вадима Н. Черашева «�
 ## Стек
 
 - Язык: Kotlin
-- Платформа: Android, `minSdk` 26
+- Платформа: Android, `minSdk` 24 (API 24+), `targetSdk`/`compileSdk` 37
 - Интерфейс: Jetpack Compose (Compose UI, Material 3 Expressive), Navigation 3
 - БД: Room
 - Виджет: Jetpack Glance (Виджет «Пауза 3 секунды»)
@@ -365,7 +365,7 @@ Android-приложение к книге Вадима Н. Черашева «�
 
 ## Сборка и запуск
 
-Нужен JDK 21. Из корня репозитория:
+Нужен JDK 21. Включено десугарирование JDK, чтобы `java.time` работал на API 24–25. Из корня репозитория:
 
 ```bash
 ./gradlew assembleDebug
