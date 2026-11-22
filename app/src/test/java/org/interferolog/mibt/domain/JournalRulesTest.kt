@@ -162,6 +162,60 @@ class JournalRulesTest {
     }
 
     @Test
+    fun speechScriptsAreSplitByChapterAndQuoted() {
+        val bare = Regex("^Скрипт \\d+ главы$")
+        assertFalse(JournalCanon.scripts.any { bare.matches(it.title) })
+        val titled = Regex("^Скрипт \\d+ главы \\d+\\. .+")
+        val nine = JournalCanon.scripts.filter { titled.matches(it.title) }
+        val expected = listOf(
+            "Скрипт 2 главы 4. Плановая индексация цены для старых клиентов",
+            "Скрипт 3 главы 4. Чистое расцепление с контрагентом-тромбом (красная зона)",
+            "Скрипт 1 главы 5. Спокойный отказ от неоплачиваемой переработки через «Развилку приоритетов»",
+            "Скрипт 2 главы 5. Переговоры о повышении компенсации на основе вклада (алгоритм из 4 шагов)",
+            "Скрипт 1 главы 6. Предложение перейти на двухконтурную архитектуру (как начать разговор без сопротивления)",
+            "Скрипт 1 главы 9. Декларация Горизонта тишины на старте ветви",
+            "Скрипт 4 главы 9. Спокойное списание мёртвой ветви",
+            "Скрипт 4 главы 10. Разговор о паспорте с близким человеком",
+            "Скрипт 3 главы 12. Ежеквартальный аудит Кристалла смысла: проверка сухого остатка",
+        )
+        assertEquals(expected, nine.map { it.title })
+        assertEquals(expected.toSet().size, nine.size)
+        assertTrue(nine.all { it.quoted })
+        assertEquals(
+            listOf(
+                "Неделя 4. На выбор вместо скрипта 3: пересборка условий самого тяжёлого источника красной зоны.",
+                "Неделя 4. На выбор вместо скрипта 2: плановое расцепление самого тяжёлого источника красной зоны.",
+                "Неделя 5.",
+                "Неделя 5.",
+                "Неделя 6.",
+                "Неделя 9.",
+                "Неделя 9.",
+                "Неделя 10.",
+                "Неделя 12.",
+            ),
+            nine.map { it.where },
+        )
+        val forbidden = "Готовой реплики в журнале нет"
+        assertFalse(
+            JournalCanon.scripts.any { card ->
+                listOfNotNull(card.title, card.body, card.where, card.intro, card.marker)
+                    .any { it.contains(forbidden) }
+            },
+        )
+        val refusal = nine.first { it.title.startsWith("Скрипт 1 главы 5.") }
+        assertTrue(refusal.body.contains("Вариант А —"))
+        assertTrue(refusal.body.contains("Вариант Б —"))
+        assertTrue(refusal.body.contains("Вариант В —"))
+        assertTrue(refusal.body.contains("Вариант Г —"))
+        val audit = nine.first { it.title.startsWith("Скрипт 3 главы 12.") }
+        assertTrue(audit.body.contains("U₁"))
+        assertTrue(audit.body.contains("U₂"))
+        assertTrue(nine.filter { it.marker != null }.all { it.marker!!.startsWith("Маркер") })
+        assertNull(JournalCanon.scripts.first { it.title == "Я пока не знаю" }.intro)
+        assertNull(JournalCanon.scripts.first { it.title == "Я сейчас в сжатии" }.marker)
+    }
+
+    @Test
     fun weekStepsNameTheChapterAfterEveryScriptReference() {
         val truncated = Regex("""скрипт\S* \d+ главы(?! \d)""")
         val offenders = JournalCanon.weeks.flatMap { week ->
