@@ -60,5 +60,8 @@ class TelemetryMarkdownTest {
         assertTrue(text.contains("открытым текстом"))
         assertTrue(text.contains("## ${BlankCanon.phaseDiary.title}"))
         assertTrue(text.contains("## ${BlankCanon.pointC.title}"))
+        assertTrue(text.contains("## ${BlankCanon.holter.title}"))
+        assertTrue(text.contains("## ${BlankCanon.sources.title}"))
+        assertTrue(text.contains("## ${BlankCanon.work.title}"))
     }
 }

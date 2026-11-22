@@ -147,6 +147,10 @@ class JournalViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { repo.deleteWell(id) }
     }
 
+    fun deleteSpend(id: Long) {
+        viewModelScope.launch { repo.deleteSpend(id) }
+    }
+
     fun saveSpend(node: String, amount: Long, note: String, cleanSheet: Boolean, canFundMirror: Boolean) {
         val cycle = ui.value.cycle ?: return
         viewModelScope.launch {
@@ -168,8 +172,13 @@ class JournalViewModel(app: Application) : AndroidViewModel(app) {
 
     fun saveSource(source: IncomeSourceEntity) {
         viewModelScope.launch {
-            repo.saveSource(source)
-            _notice.value = "Источник добавлен."
+            if (source.id == 0L) {
+                repo.saveSource(source)
+                _notice.value = "Источник добавлен."
+            } else {
+                repo.updateSource(source)
+                _notice.value = "Источник сохранён."
+            }
         }
     }
 
@@ -198,8 +207,20 @@ class JournalViewModel(app: Application) : AndroidViewModel(app) {
 
     fun saveWork(item: WorkItemEntity) {
         viewModelScope.launch {
-            repo.saveWork(item)
-            _notice.value = "Дело добавлено."
+            if (item.id == 0L) {
+                repo.saveWork(item)
+                _notice.value = "Дело добавлено."
+            } else {
+                repo.updateWork(item)
+                _notice.value = "Дело сохранено."
+            }
+        }
+    }
+
+    fun deleteWork(id: Long) {
+        viewModelScope.launch {
+            repo.deleteWork(id)
+            _notice.value = "Дело удалено."
         }
     }
 

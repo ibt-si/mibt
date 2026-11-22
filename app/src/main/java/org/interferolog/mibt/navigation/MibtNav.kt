@@ -421,13 +421,13 @@ private fun screenTitle(top: NavKey?, week: Int?, intake: Boolean): String = whe
     MapRoute -> "Маршрут"
     is WeekRoute -> JournalCanon.week(top.number).title
     is SilenceGateRoute -> "Минута тишины"
-    HolterRoute -> "Холтер четырёх узлов"
+    HolterRoute -> BlankCanon.holter.title
     QuickSpendRoute -> "Быстрая запись траты"
     PauseRoute -> BlankCanon.phaseDiary.title
     PointCRoute -> BlankCanon.pointC.title
-    SourcesRoute -> "Индекс сопротивления источников"
+    SourcesRoute -> BlankCanon.sources.title
     PriceRoute -> "Тренажёр цены"
-    WorkRoute -> "Дела участка"
+    WorkRoute -> BlankCanon.work.title
     FamilyRoute -> "Два контура"
     RestRoute -> "Масса покоя"
     CrisisRoute -> "Карта кризиса"

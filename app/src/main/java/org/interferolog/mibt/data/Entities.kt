@@ -3,6 +3,7 @@
 
 package org.interferolog.mibt.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -140,6 +141,7 @@ data class IncomeSourceEntity(
     val incomeShare: Double,
     val hoursShare: Double,
     val frictionScore: Int,
+    @ColumnInfo(defaultValue = "''") val decision: String = "",
 )
 
 @Entity(
@@ -170,6 +172,7 @@ data class WorkItemEntity(
     val hoursShare: Double,
     val frictionScore: Int,
     val mark: String,
+    @ColumnInfo(defaultValue = "''") val decision: String = "",
 )
 
 @Entity(

@@ -688,13 +688,13 @@ private fun BlankLinks(
                 ReminderEditor(viewModel)
             }
         }
-        3 -> WeekLink("Бланк 2. Холтер четырёх узлов") { backStack.open(HolterRoute) }
+        3 -> WeekLink(BlankCanon.holter.title) { backStack.open(HolterRoute) }
         4 -> {
-            WeekLink("Бланк 3. Индекс сопротивления") { backStack.open(SourcesRoute) }
+            WeekLink(BlankCanon.sources.title) { backStack.open(SourcesRoute) }
             WeekLink("Тренажёр цены") { backStack.reveal(PriceRoute) }
         }
         5 -> {
-            WeekLink("Бланк 3н. Дела участка") { backStack.reveal(WorkRoute) }
+            WeekLink(BlankCanon.work.title) { backStack.reveal(WorkRoute) }
             WeekLink("Тренажёр цены") { backStack.reveal(PriceRoute) }
         }
         6 -> WeekLink("Бланк 4. Два контура") { backStack.reveal(FamilyRoute) }
