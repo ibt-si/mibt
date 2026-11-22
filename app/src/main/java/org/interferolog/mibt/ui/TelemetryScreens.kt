@@ -85,6 +85,7 @@ fun CaptureScreen(viewModel: JournalViewModel) {
             )
         }
         blank.referenceTables.forEach { ReferenceTable(it) }
+        SectionHeader(blank.entriesTitle)
         ExampleRows(blank.columns, blank.examples)
         impulseShareLine(ui.diary.size, ui.diary.count { it.impulse == "EMPTY" })?.let { MetaText(it) }
         EntryList(
@@ -137,6 +138,7 @@ fun PointCScreen(viewModel: JournalViewModel) {
             }
         }
         blank.referenceTables.forEach { ReferenceTable(it) }
+        SectionHeader(blank.entriesTitle)
         ExampleRows(blank.columns, blank.examples)
         EntryList(
             columns = blank.columns,
