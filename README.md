@@ -23,7 +23,7 @@ An Android app that accompanies Vadim N. Cherashev’s book *The Physics of Mone
 - **Horizon of silence lock.** Until the review date, a new branch cannot be closed.
 - **Coupon inflow calculator.** In the Investment passport, a coupon amount is split by the user’s own percentages for reinvestment, Support and the Crystal.
 - **Scheduled maintenance after 12 weeks.** Four routine rhythms and a check of five markers of a sound system.
-- **Scripts.** Phrases that the log quotes verbatim, and prompts for what to write in one’s own words where the log points to a chapter.
+- **Scripts.** Speech scripts quoted verbatim from the book, with the week each one belongs to.
 
 ## Core concepts
 
@@ -227,7 +227,7 @@ Android-приложение к книге Вадима Н. Черашева «�
 - **Блокировка Горизонта тишины.** Пока не наступила дата ревизии, новое направление закрыть нельзя.
 - **Калькулятор купонного притока.** В Инвестиционном паспорте сумма купона разносится по долям реинвеста, Опоры и Кристалла, которые задаёт пользователь.
 - **Штатное обслуживание после 12 недель.** Четыре регламентных ритма и проверка пяти маркеров исправной системы.
-- **Скрипты.** Фразы, которые журнал приводит дословно, и подсказки, что записать своими словами там, где журнал отсылает к главе.
+- **Скрипты.** Речевые скрипты, приведённые дословно из книги, и неделя, к которой относится каждый.
 
 ## Основные концепты
 
