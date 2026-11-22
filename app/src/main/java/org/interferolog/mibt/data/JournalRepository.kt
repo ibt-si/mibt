@@ -139,7 +139,7 @@ class JournalRepository(private val db: MibtDatabase) {
                 passport = passport as InvestmentPassportEntity?,
                 people = people as List<ClusterPersonEntity>,
                 position = position as PositionAuditEntity?,
-                rings = rings as List<MeaningRingEntity>,
+                rings = latestRings(rings as List<MeaningRingEntity>),
                 maintenance = maintenance as List<MaintenanceLogEntity>,
                 markers = markers as List<MarkerCheckEntity>,
                 reminders = reminders,
@@ -346,7 +346,13 @@ class JournalRepository(private val db: MibtDatabase) {
     suspend fun savePassport(passport: InvestmentPassportEntity) = dao.upsertPassport(passport)
     suspend fun savePerson(person: ClusterPersonEntity) = dao.insertPerson(person)
     suspend fun savePosition(audit: PositionAuditEntity) = dao.upsertPosition(audit)
-    suspend fun saveRing(ring: MeaningRingEntity) = dao.insertRing(ring)
+
+    suspend fun saveRing(ring: MeaningRingEntity) {
+        db.withTransaction {
+            saveMeaningRing(dao.rings(ring.cycleId), dao::insertRing, dao::updateRing, ring)
+        }
+    }
+
     suspend fun logMaintenance(entry: MaintenanceLogEntity) = dao.insertMaintenance(entry)
     suspend fun setMarker(entry: MarkerCheckEntity) = dao.insertMarker(entry)
     suspend fun saveReminder(plan: ReminderPlanEntity) = dao.upsertReminder(plan)
@@ -379,7 +385,7 @@ class JournalRepository(private val db: MibtDatabase) {
             passport = dao.passport(cycleId),
             people = dao.people(cycleId),
             position = dao.position(cycleId),
-            rings = dao.rings(cycleId),
+            rings = latestRings(dao.rings(cycleId)),
             maintenance = dao.maintenance(cycleId),
             markers = dao.markers(cycleId),
         )

@@ -7,6 +7,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -265,6 +266,9 @@ interface JournalDao {
 
     @Insert
     suspend fun insertRing(ring: MeaningRingEntity)
+
+    @Update
+    suspend fun updateRing(ring: MeaningRingEntity)
 
     @Query("SELECT * FROM meaning_rings WHERE cycleId = :cycleId ORDER BY ring")
     fun observeRings(cycleId: Long): Flow<List<MeaningRingEntity>>

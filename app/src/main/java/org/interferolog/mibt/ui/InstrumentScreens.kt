@@ -25,7 +25,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -41,17 +40,18 @@ import org.interferolog.mibt.JournalViewModel
 import org.interferolog.mibt.content.CALC_DISCLAIMER
 import org.interferolog.mibt.content.JournalCanon
 import org.interferolog.mibt.data.ClusterPersonEntity
-import org.interferolog.mibt.data.CrisisMapEntity
+import org.interferolog.mibt.data.CrisisDraft
 import org.interferolog.mibt.data.DebtEntity
-import org.interferolog.mibt.data.FamilyPlanEntity
+import org.interferolog.mibt.data.FamilyDraft
 import org.interferolog.mibt.data.FanBranchEntity
 import org.interferolog.mibt.data.FanChannelEntity
 import org.interferolog.mibt.data.IncomeSourceEntity
-import org.interferolog.mibt.data.InvestmentPassportEntity
-import org.interferolog.mibt.data.MeaningRingEntity
-import org.interferolog.mibt.data.PositionAuditEntity
-import org.interferolog.mibt.data.RestMassEntity
+import org.interferolog.mibt.data.PassportDraft
+import org.interferolog.mibt.data.PositionDraft
+import org.interferolog.mibt.data.RestDraft
+import org.interferolog.mibt.data.RingDraft
 import org.interferolog.mibt.data.WorkItemEntity
+import org.interferolog.mibt.data.toDraft
 import org.interferolog.mibt.domain.Circle
 import org.interferolog.mibt.domain.DebtInput
 import org.interferolog.mibt.domain.DebtStrategy
@@ -83,20 +83,6 @@ import org.interferolog.mibt.domain.weeklyTrancheRemainder
 import java.io.File
 import java.time.LocalDate
 import java.time.ZoneId
-import kotlin.math.roundToLong
-
-private fun formatKopecksInput(kopecks: Long): String {
-    if (kopecks == 0L) return ""
-    val rubles = kopecks / 100
-    val rem = kotlin.math.abs(kopecks % 100)
-    return if (rem == 0L) rubles.toString() else "$rubles.${"%02d".format(rem)}"
-}
-
-private fun formatDoubleInput(value: Double): String {
-    if (value == 0.0) return ""
-    val rounded = value.roundToLong()
-    return if (kotlin.math.abs(value - rounded) < 1e-6) rounded.toString() else "%.2f".format(value)
-}
 
 private fun fiTone(zone: FiZone): CardTone = when (zone) {
     FiZone.GREEN -> CardTone.Primary
@@ -431,14 +417,7 @@ fun FamilyScreen(viewModel: JournalViewModel) {
         return
     }
     val saved = ui.family
-    var income1 by remember(saved) { mutableStateOf(saved?.let { formatKopecksInput(it.income1) }.orEmpty()) }
-    var income2 by remember(saved) { mutableStateOf(saved?.let { formatKopecksInput(it.income2) }.orEmpty()) }
-    var foundation by remember(saved) { mutableStateOf(saved?.let { formatKopecksInput(it.foundation) }.orEmpty()) }
-    var fund by remember(saved) { mutableStateOf(saved?.let { formatKopecksInput(it.targetFund) }.orEmpty()) }
-    var personal1 by remember(saved) { mutableStateOf(saved?.let { formatKopecksInput(it.personal1) }.orEmpty()) }
-    var personal2 by remember(saved) { mutableStateOf(saved?.let { formatKopecksInput(it.personal2) }.orEmpty()) }
-    var threshold by remember(saved) { mutableStateOf(saved?.let { formatKopecksInput(it.threshold) }.orEmpty()) }
-    var note by remember(saved) { mutableStateOf(saved?.saturdayNote.orEmpty()) }
+    var draft by remember(cycleId, saved) { mutableStateOf(saved?.toDraft() ?: FamilyDraft()) }
     var left by remember { mutableIntStateOf(0) }
     var purchase by remember { mutableStateOf("") }
 
@@ -450,7 +429,14 @@ fun FamilyScreen(viewModel: JournalViewModel) {
     }
     val now = System.currentTimeMillis()
     val quarantine = ui.quarantines.firstOrNull { it.kind == "H24" && it.endsAt > now }
-    val anyMoney = listOf(income1, income2, foundation, fund, personal1, personal2).any { it.isNotBlank() }
+    val anyMoney = listOf(
+        draft.income1,
+        draft.income2,
+        draft.foundation,
+        draft.targetFund,
+        draft.personal1,
+        draft.personal2,
+    ).any { it.isNotBlank() }
 
     ScreenColumn {
         QuietCard(JournalCanon.week(6).lead, CardTone.Secondary)
@@ -479,17 +465,17 @@ fun FamilyScreen(viewModel: JournalViewModel) {
             subtitle = "Общая Опора и обязательства не урезаются ни в одном споре. Общий Инструмент сверх порога ждёт 24 часа. Целевой фонд меняется только через спокойный разговор. Личные доли — без отчётов.",
         )
         SectionCard {
-            Field("Доход 1", income1, { income1 = it }, number = true, suffix = "₽")
-            Field("Доход 2", income2, { income2 = it }, number = true, suffix = "₽")
-            Field("Фундамент Ф", foundation, { foundation = it }, number = true, suffix = "₽")
-            Field("Целевой фонд", fund, { fund = it }, number = true, suffix = "₽")
-            Field("Личная доля 1", personal1, { personal1 = it }, number = true, suffix = "₽")
-            Field("Личная доля 2", personal2, { personal2 = it }, number = true, suffix = "₽")
-            Field("Порог общей траты", threshold, { threshold = it }, number = true, suffix = "₽")
-            val f = parseRubles(foundation) ?: 0
-            val remainder = familyRemainder(parseRubles(income1) ?: 0, parseRubles(income2) ?: 0, f)
+            Field("Доход 1", draft.income1, { draft = draft.copy(income1 = it) }, number = true, suffix = "₽")
+            Field("Доход 2", draft.income2, { draft = draft.copy(income2 = it) }, number = true, suffix = "₽")
+            Field("Фундамент Ф", draft.foundation, { draft = draft.copy(foundation = it) }, number = true, suffix = "₽")
+            Field("Целевой фонд", draft.targetFund, { draft = draft.copy(targetFund = it) }, number = true, suffix = "₽")
+            Field("Личная доля 1", draft.personal1, { draft = draft.copy(personal1 = it) }, number = true, suffix = "₽")
+            Field("Личная доля 2", draft.personal2, { draft = draft.copy(personal2 = it) }, number = true, suffix = "₽")
+            Field("Порог общей траты", draft.threshold, { draft = draft.copy(threshold = it) }, number = true, suffix = "₽")
+            val f = parseRubles(draft.foundation) ?: 0
+            val remainder = familyRemainder(parseRubles(draft.income1) ?: 0, parseRubles(draft.income2) ?: 0, f)
             if (anyMoney) {
-                val sumCheck = f + (parseRubles(fund) ?: 0) + (parseRubles(personal1) ?: 0) + (parseRubles(personal2) ?: 0)
+                val sumCheck = f + (parseRubles(draft.targetFund) ?: 0) + (parseRubles(draft.personal1) ?: 0) + (parseRubles(draft.personal2) ?: 0)
                 MetricCard(
                     value = formatRubles(remainder),
                     caption = "Свободный остаток С",
@@ -500,19 +486,7 @@ fun FamilyScreen(viewModel: JournalViewModel) {
                 MetaText("Свободный остаток С появится, когда будут вписаны свои суммы. Пример из главы в поля не подставлен.")
             }
             CommitButton("Сохранить контуры") {
-                viewModel.saveFamily(
-                    FamilyPlanEntity(
-                        cycleId = cycleId,
-                        income1 = parseRubles(income1) ?: 0,
-                        income2 = parseRubles(income2) ?: 0,
-                        foundation = f,
-                        targetFund = parseRubles(fund) ?: 0,
-                        personal1 = parseRubles(personal1) ?: 0,
-                        personal2 = parseRubles(personal2) ?: 0,
-                        threshold = parseRubles(threshold) ?: 0,
-                        saturdayNote = note,
-                    ),
-                )
+                viewModel.saveFamily(draft.toEntity(cycleId))
             }
         }
 
@@ -527,7 +501,7 @@ fun FamilyScreen(viewModel: JournalViewModel) {
             JournalCanon.saturdayQuestions.forEachIndexed { idx, q ->
                 BodyText("${idx + 1}. $q")
             }
-            Field("Запись сверки", note, { note = it }, singleLine = false)
+            Field("Запись сверки", draft.saturdayNote, { draft = draft.copy(saturdayNote = it) }, singleLine = false)
             QuietCard("Фраза стоп-сигнала: «Я сейчас в сжатии».", CardTone.Secondary)
         }
 
@@ -543,7 +517,7 @@ fun FamilyScreen(viewModel: JournalViewModel) {
                 enabled = parseRubles(purchase) != null,
             ) {
                 val amount = parseRubles(purchase) ?: return@TonalButton
-                val limit = parseRubles(threshold) ?: ui.family?.threshold ?: 0
+                val limit = parseRubles(draft.threshold) ?: ui.family?.threshold ?: 0
                 if (amount > limit && quarantine == null) {
                     viewModel.startQuarantine("H24", 24, "Общая трата ${formatRubles(amount)}")
                 }
@@ -561,13 +535,7 @@ fun RestScreen(viewModel: JournalViewModel) {
         return
     }
     val saved = ui.rest
-    var support by remember(saved) { mutableStateOf(saved?.let { formatKopecksInput(it.support) }.orEmpty()) }
-    var tool by remember(saved) { mutableStateOf(saved?.let { formatKopecksInput(it.tool) }.orEmpty()) }
-    var obligations by remember(saved) { mutableStateOf(saved?.let { formatKopecksInput(it.obligations) }.orEmpty()) }
-    var balance by remember(saved) { mutableStateOf(saved?.let { formatKopecksInput(it.balance) }.orEmpty()) }
-    var profile by remember(saved) { mutableStateOf(saved?.profile ?: "HIRE") }
-    var cut by remember(saved) { mutableStateOf(saved?.let { formatDoubleInput(it.firstCutPercent) }.orEmpty()) }
-    var strategy by remember(saved) { mutableStateOf(saved?.strategy ?: "AVALANCHE") }
+    var draft by remember(cycleId, saved) { mutableStateOf(saved?.toDraft() ?: RestDraft()) }
     var income by remember { mutableStateOf("") }
     var withdrawal by remember { mutableStateOf("") }
     var debtName by remember { mutableStateOf("") }
@@ -577,9 +545,9 @@ fun RestScreen(viewModel: JournalViewModel) {
     var debtExtra by remember { mutableStateOf("") }
 
     ScreenColumn {
-        val minimum = carryingMinimum(parseRubles(support) ?: 0, parseRubles(tool) ?: 0, parseRubles(obligations) ?: 0)
-        val months = runwayMonths(parseRubles(balance) ?: 0, minimum)
-        val target = profileMonths(profile)
+        val minimum = carryingMinimum(parseRubles(draft.support) ?: 0, parseRubles(draft.tool) ?: 0, parseRubles(draft.obligations) ?: 0)
+        val months = runwayMonths(parseRubles(draft.balance) ?: 0, minimum)
+        val target = profileMonths(draft.profile)
         val zone = months?.let { runwayZone(it, target) }
 
         MetricCard(
@@ -591,38 +559,26 @@ fun RestScreen(viewModel: JournalViewModel) {
 
         SectionHeader("Масса покоя")
         SectionCard {
-            Field("Опора U₁", support, { support = it }, number = true, suffix = "₽")
-            Field("Инструмент U₂", tool, { tool = it }, number = true, suffix = "₽")
-            Field("Обязательства", obligations, { obligations = it }, number = true, suffix = "₽")
-            Field("Масса покоя B", balance, { balance = it }, number = true, suffix = "₽")
+            Field("Опора U₁", draft.support, { draft = draft.copy(support = it) }, number = true, suffix = "₽")
+            Field("Инструмент U₂", draft.tool, { draft = draft.copy(tool = it) }, number = true, suffix = "₽")
+            Field("Обязательства", draft.obligations, { draft = draft.copy(obligations = it) }, number = true, suffix = "₽")
+            Field("Масса покоя B", draft.balance, { draft = draft.copy(balance = it) }, number = true, suffix = "₽")
             Field(
                 label = "Первое сечение",
-                value = cut,
-                onValue = { cut = it },
+                value = draft.firstCutPercent,
+                onValue = { draft = draft.copy(firstCutPercent = it) },
                 number = true,
                 suffix = "%",
                 supportingText = "1–5% при долгах; 10–20% без долгов.",
             )
             ChoiceGroup(
                 options = listOf("HIRE" to "Найм", "FREELANCE" to "Фриланс", "BUSINESS" to "Бизнес"),
-                selected = profile,
-                onSelect = { profile = it },
+                selected = draft.profile,
+                onSelect = { draft = draft.copy(profile = it) },
             )
             MetaText("Цель профиля: $target месяцев.")
             CommitButton("Записать массу покоя") {
-                viewModel.saveRest(
-                    RestMassEntity(
-                        cycleId = cycleId,
-                        support = parseRubles(support) ?: 0,
-                        tool = parseRubles(tool) ?: 0,
-                        obligations = parseRubles(obligations) ?: 0,
-                        balance = parseRubles(balance) ?: ui.rest?.balance ?: 0,
-                        profile = profile,
-                        firstCutPercent = cut.toDoubleOrNull() ?: 0.0,
-                        accountOpened = true,
-                        strategy = strategy,
-                    ),
-                )
+                viewModel.saveRest(draft.toEntity(cycleId, saved))
             }
         }
 
@@ -657,8 +613,8 @@ fun RestScreen(viewModel: JournalViewModel) {
         SectionHeader("Одна мишень")
         ChoiceGroup(
             options = listOf("AVALANCHE" to "Лавина", "SNOWBALL" to "Снежный ком"),
-            selected = strategy,
-            onSelect = { strategy = it },
+            selected = draft.strategy,
+            onSelect = { draft = draft.copy(strategy = it) },
         )
         if (ui.debts.isNotEmpty()) {
             SegmentedGroup(count = ui.debts.size) { index, shape ->
@@ -682,7 +638,7 @@ fun RestScreen(viewModel: JournalViewModel) {
         }
         val schedule = amortize(
             ui.debts.map { DebtInput(it.name, it.balance, it.ratePercent, it.minPayment, it.extra) },
-            if (strategy == "SNOWBALL") DebtStrategy.SNOWBALL else DebtStrategy.AVALANCHE,
+            if (draft.strategy == "SNOWBALL") DebtStrategy.SNOWBALL else DebtStrategy.AVALANCHE,
         )
         if (schedule.isNotEmpty()) {
             SectionCard {
@@ -738,19 +694,14 @@ fun CrisisScreen(viewModel: JournalViewModel) {
         return
     }
     val saved = ui.crisis
-    var accessible by remember(saved) { mutableStateOf(saved?.let { formatKopecksInput(it.accessible) }.orEmpty()) }
-    var staff by remember(saved) { mutableStateOf(saved?.let { formatKopecksInput(it.staffMinimum) }.orEmpty()) }
-    var emergency by remember(saved) { mutableStateOf(saved?.let { formatKopecksInput(it.emergencyMinimum) }.orEmpty()) }
-    var cuts by remember(saved) { mutableStateOf(saved?.cutList.orEmpty()) }
-    var ring by remember(saved) { mutableStateOf(saved?.supportRing.orEmpty()) }
-    var offers by remember(saved) { mutableStateOf(saved?.offers.orEmpty()) }
+    var draft by remember(cycleId, saved) { mutableStateOf(saved?.toDraft() ?: CrisisDraft()) }
     var tranche by remember { mutableStateOf("") }
 
     val now = System.currentTimeMillis()
     val quarantine = ui.quarantines.firstOrNull { it.kind == "H72" && it.endsAt > now }
-    val emergencyValue = parseRubles(emergency) ?: 0
+    val emergencyValue = parseRubles(draft.emergencyMinimum) ?: 0
     val profile = profileMonths(ui.rest?.profile ?: "HIRE")
-    val runway = runwayMonths(parseRubles(accessible) ?: 0, emergencyValue)
+    val runway = runwayMonths(parseRubles(draft.accessible) ?: 0, emergencyValue)
     val crisisZone = runway?.let { runwayZone(it, profile) }
     val trancheRemainder = weeklyTrancheRemainder(emergencyValue)
     val trancheNote = if (trancheRemainder == 0L) "" else " Остаток ${formatRubles(trancheRemainder)} остаётся в запасе."
@@ -766,25 +717,14 @@ fun CrisisScreen(viewModel: JournalViewModel) {
 
         SectionHeader("Карта кризиса")
         SectionCard {
-            Field("Масса покоя в доступе", accessible, { accessible = it }, number = true, suffix = "₽")
-            Field("Штатный минимум", staff, { staff = it }, number = true, suffix = "₽")
-            Field("Аварийный минимум", emergency, { emergency = it }, number = true, suffix = "₽")
-            Field("Список отсечения", cuts, { cuts = it }, singleLine = false)
-            Field("Кольцо опоры", ring, { ring = it }, singleLine = false)
-            Field("Три предложения рынку", offers, { offers = it }, singleLine = false)
+            Field("Масса покоя в доступе", draft.accessible, { draft = draft.copy(accessible = it) }, number = true, suffix = "₽")
+            Field("Штатный минимум", draft.staffMinimum, { draft = draft.copy(staffMinimum = it) }, number = true, suffix = "₽")
+            Field("Аварийный минимум", draft.emergencyMinimum, { draft = draft.copy(emergencyMinimum = it) }, number = true, suffix = "₽")
+            Field("Список отсечения", draft.cutList, { draft = draft.copy(cutList = it) }, singleLine = false)
+            Field("Кольцо опоры", draft.supportRing, { draft = draft.copy(supportRing = it) }, singleLine = false)
+            Field("Три предложения рынку", draft.offers, { draft = draft.copy(offers = it) }, singleLine = false)
             CommitButton("Сохранить карту") {
-                viewModel.saveCrisis(
-                    CrisisMapEntity(
-                        cycleId = cycleId,
-                        accessible = parseRubles(accessible) ?: 0,
-                        staffMinimum = parseRubles(staff) ?: 0,
-                        emergencyMinimum = emergencyValue,
-                        cutList = cuts,
-                        supportRing = ring,
-                        offers = offers,
-                        drillDone = ui.crisis?.drillDone == true,
-                    ),
-                )
+                viewModel.saveCrisis(draft.toEntity(cycleId))
             }
         }
 
@@ -795,7 +735,9 @@ fun CrisisScreen(viewModel: JournalViewModel) {
             }
             OutlinedButton(
                 onClick = {
-                    viewModel.saveCrisis((ui.crisis ?: CrisisMapEntity(cycleId)).copy(drillDone = true))
+                    val marked = draft.copy(drillDone = true)
+                    draft = marked
+                    viewModel.saveCrisis(marked.toEntity(cycleId))
                 },
                 enabled = ui.crisis?.drillDone != true,
                 modifier = Modifier.fillMaxWidth(),
@@ -1048,25 +990,7 @@ fun PassportScreen(viewModel: JournalViewModel) {
         return
     }
     val saved = ui.passport
-    val fields = remember(saved) {
-        mutableStateListOf(
-            saved?.massStatus.orEmpty(),
-            saved?.contributionRule.orEmpty(),
-            saved?.horizonRule.orEmpty(),
-            saved?.allocation.orEmpty(),
-            saved?.riskLimit.orEmpty(),
-            saved?.stormRule.orEmpty(),
-            saved?.hygiene.orEmpty(),
-        )
-    }
-    var balance by remember(saved) { mutableStateOf(saved?.let { formatKopecksInput(it.accountBalance) }.orEmpty()) }
-    var payment by remember(saved) { mutableStateOf(saved?.let { formatKopecksInput(it.monthlyContribution) }.orEmpty()) }
-    var rate by remember(saved) { mutableStateOf(saved?.let { formatDoubleInput(it.annualRate * 100.0) }.orEmpty()) }
-    var years by remember(saved) { mutableStateOf(saved?.takeIf { it.years > 0 }?.years?.toString().orEmpty()) }
-    var reinvest by remember(saved) { mutableStateOf(saved?.let { formatDoubleInput(it.reinvestPercent) }.orEmpty()) }
-    var support by remember(saved) { mutableStateOf(saved?.let { formatDoubleInput(it.supportPercent) }.orEmpty()) }
-    var crystal by remember(saved) { mutableStateOf(saved?.let { formatDoubleInput(it.crystalPercent) }.orEmpty()) }
-    var drawdown by remember(saved) { mutableStateOf(saved?.drawdownOk ?: false) }
+    var draft by remember(cycleId, saved) { mutableStateOf(saved?.toDraft() ?: PassportDraft()) }
     var coupon by remember { mutableStateOf("") }
 
     ScreenColumn {
@@ -1077,20 +1001,20 @@ fun PassportScreen(viewModel: JournalViewModel) {
         SectionHeader("Семь полей паспорта")
         SectionCard {
             JournalCanon.passportFields.forEachIndexed { index, label ->
-                Field(label, fields[index], { fields[index] = it }, singleLine = false)
+                Field(label, draft.textAt(index), { draft = draft.withText(index, it) }, singleLine = false)
             }
         }
 
         SectionHeader("Иллюстрация сложного процента")
         SectionCard {
-            Field("Счёт", balance, { balance = it }, number = true, suffix = "₽")
-            Field("Взнос в месяц", payment, { payment = it }, number = true, suffix = "₽")
-            Field("Доходность в год", rate, { rate = it }, number = true, suffix = "%")
-            Field("Срок", years, { years = it }, integer = true, suffix = "лет")
-            val paymentKop = parseRubles(payment)
-            val rateValue = rate.toDoubleOrNull()
-            val yearValue = years.toIntOrNull()
-            if (payment.isNotBlank() && rate.isNotBlank() && years.isNotBlank() &&
+            Field("Счёт", draft.accountBalance, { draft = draft.copy(accountBalance = it) }, number = true, suffix = "₽")
+            Field("Взнос в месяц", draft.monthlyContribution, { draft = draft.copy(monthlyContribution = it) }, number = true, suffix = "₽")
+            Field("Доходность в год", draft.annualRatePercent, { draft = draft.copy(annualRatePercent = it) }, number = true, suffix = "%")
+            Field("Срок", draft.years, { draft = draft.copy(years = it) }, integer = true, suffix = "лет")
+            val paymentKop = parseRubles(draft.monthlyContribution)
+            val rateValue = draft.annualRatePercent.toDoubleOrNull()
+            val yearValue = draft.years.toIntOrNull()
+            if (draft.monthlyContribution.isNotBlank() && draft.annualRatePercent.isNotBlank() && draft.years.isNotBlank() &&
                 paymentKop != null && rateValue != null && yearValue != null && yearValue > 0
             ) {
                 val value = futureValue(paymentKop, rateValue / 100.0, yearValue * 12)
@@ -1107,11 +1031,11 @@ fun PassportScreen(viewModel: JournalViewModel) {
 
         SectionHeader("Стресс-тест переборки")
         SectionCard {
-            val half = (parseRubles(balance) ?: 0) / 2
-            if (balance.isNotBlank()) {
+            val half = (parseRubles(draft.accountBalance) ?: 0) / 2
+            if (draft.accountBalance.isNotBlank()) {
                 BodyText("Просадка 50% оставляет на счёте ${formatRubles(half)}. Опора, рабочие инструменты и сон при этом остаются отдельной Массой покоя.")
             }
-            SwitchRow("Переборка выдержала стресс-тест", drawdown) { drawdown = it }
+            SwitchRow("Переборка выдержала стресс-тест", draft.drawdownOk) { draft = draft.copy(drawdownOk = it) }
         }
 
         SectionHeader(
@@ -1120,16 +1044,16 @@ fun PassportScreen(viewModel: JournalViewModel) {
         )
         SectionCard {
             Field("Купонный приток", coupon, { coupon = it }, number = true, suffix = "₽")
-            Field("Реинвест", reinvest, { reinvest = it }, number = true, suffix = "%")
-            Field("В Опору", support, { support = it }, number = true, suffix = "%")
-            Field("В Кристалл", crystal, { crystal = it }, number = true, suffix = "%")
+            Field("Реинвест", draft.reinvestPercent, { draft = draft.copy(reinvestPercent = it) }, number = true, suffix = "%")
+            Field("В Опору", draft.supportPercent, { draft = draft.copy(supportPercent = it) }, number = true, suffix = "%")
+            Field("В Кристалл", draft.crystalPercent, { draft = draft.copy(crystalPercent = it) }, number = true, suffix = "%")
             val couponKop = parseRubles(coupon)
-            if (coupon.isNotBlank() && couponKop != null && listOf(reinvest, support, crystal).all { it.isNotBlank() }) {
+            if (coupon.isNotBlank() && couponKop != null && listOf(draft.reinvestPercent, draft.supportPercent, draft.crystalPercent).all { it.isNotBlank() }) {
                 val split = splitCoupon(
                     couponKop,
-                    reinvest.toDoubleOrNull() ?: 0.0,
-                    support.toDoubleOrNull() ?: 0.0,
-                    crystal.toDoubleOrNull() ?: 0.0,
+                    draft.reinvestPercent.toDoubleOrNull() ?: 0.0,
+                    draft.supportPercent.toDoubleOrNull() ?: 0.0,
+                    draft.crystalPercent.toDoubleOrNull() ?: 0.0,
                 )
                 QuietCard(
                     "Реинвест ${formatRubles(split.first)}, Опора ${formatRubles(split.second)}, Кристалл ${formatRubles(split.third)}.",
@@ -1139,26 +1063,7 @@ fun PassportScreen(viewModel: JournalViewModel) {
         }
 
         CommitButton("Сохранить паспорт") {
-            viewModel.savePassport(
-                InvestmentPassportEntity(
-                    cycleId = cycleId,
-                    massStatus = fields[0],
-                    contributionRule = fields[1],
-                    horizonRule = fields[2],
-                    allocation = fields[3],
-                    riskLimit = fields[4],
-                    stormRule = fields[5],
-                    hygiene = fields[6],
-                    accountBalance = parseRubles(balance) ?: 0,
-                    monthlyContribution = parseRubles(payment) ?: 0,
-                    annualRate = (rate.toDoubleOrNull() ?: 0.0) / 100.0,
-                    years = years.toIntOrNull() ?: 0,
-                    reinvestPercent = reinvest.toDoubleOrNull() ?: 0.0,
-                    supportPercent = support.toDoubleOrNull() ?: 0.0,
-                    crystalPercent = crystal.toDoubleOrNull() ?: 0.0,
-                    drawdownOk = drawdown,
-                ),
-            )
+            viewModel.savePassport(draft.toEntity(cycleId))
         }
     }
 }
@@ -1256,42 +1161,21 @@ fun CrystalScreen(viewModel: JournalViewModel) {
         return
     }
     val savedAudit = ui.position
-    val spheres = remember(savedAudit) {
-        mutableStateListOf(
-            savedAudit?.craft.orEmpty(),
-            savedAudit?.surplus.orEmpty(),
-            savedAudit?.people.orEmpty(),
-            savedAudit?.horizon.orEmpty(),
-            savedAudit?.timeFeel.orEmpty(),
-        )
-    }
-    var answer by remember(savedAudit) { mutableStateOf(savedAudit?.answer.orEmpty()) }
-    var what by remember { mutableStateOf("") }
-    var share by remember { mutableStateOf("") }
-    var hours by remember { mutableStateOf("") }
-    var stone by remember { mutableStateOf("") }
+    var positionDraft by remember(cycleId, savedAudit) { mutableStateOf(savedAudit?.toDraft() ?: PositionDraft()) }
     var ring by remember { mutableIntStateOf(1) }
+    val savedRing = ui.rings.firstOrNull { it.ring == ring }
+    var ringDraft by remember(cycleId, ring, savedRing) { mutableStateOf(savedRing?.toDraft() ?: RingDraft()) }
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
     ScreenColumn {
         SectionHeader("Бланк 10. Сверка позиции")
         SectionCard {
             JournalCanon.positionSpheres.forEachIndexed { index, label ->
-                Field(label, spheres[index], { spheres[index] = it })
+                Field(label, positionDraft.sphereAt(index), { positionDraft = positionDraft.withSphere(index, it) })
             }
-            Field("Ответ в двух-трёх предложениях", answer, { answer = it }, singleLine = false)
+            Field("Ответ в двух-трёх предложениях", positionDraft.answer, { positionDraft = positionDraft.copy(answer = it) }, singleLine = false)
             CommitButton("Сохранить сверку позиции") {
-                viewModel.savePosition(
-                    PositionAuditEntity(
-                        cycleId = cycleId,
-                        craft = spheres[0],
-                        surplus = spheres[1],
-                        people = spheres[2],
-                        horizon = spheres[3],
-                        timeFeel = spheres[4],
-                        answer = answer,
-                    ),
-                )
+                viewModel.savePosition(positionDraft.toEntity(cycleId))
             }
         }
 
@@ -1303,30 +1187,21 @@ fun CrystalScreen(viewModel: JournalViewModel) {
                 onSelect = { ring = it.toInt() },
             )
             QuietCard(JournalCanon.rings[ring - 1], CardTone.Secondary)
-            Field("Что создаётся", what, { what = it }, singleLine = false)
-            Field("Доля узла Рост", share, { share = it }, number = true, suffix = "%")
-            Field("Часы в неделю", hours, { hours = it }, number = true, suffix = "ч")
-            Field("Первый камень за 30 дней", stone, { stone = it })
+            Field("Что создаётся", ringDraft.what, { ringDraft = ringDraft.copy(what = it) }, singleLine = false)
+            Field("Доля узла Рост", ringDraft.growthShare, { ringDraft = ringDraft.copy(growthShare = it) }, number = true, suffix = "%")
+            Field("Часы в неделю", ringDraft.hoursPerWeek, { ringDraft = ringDraft.copy(hoursPerWeek = it) }, number = true, suffix = "ч")
+            Field("Первый камень за 30 дней", ringDraft.firstStone, { ringDraft = ringDraft.copy(firstStone = it) })
             TonalButton("Записать кольцо", modifier = Modifier.fillMaxWidth()) {
-                viewModel.saveRing(
-                    MeaningRingEntity(
-                        cycleId = cycleId,
-                        ring = ring,
-                        what = what,
-                        growthShare = share.toDoubleOrNull() ?: 0.0,
-                        hoursPerWeek = hours.toDoubleOrNull() ?: 0.0,
-                        firstStone = stone,
-                    ),
-                )
-                what = ""
-                share = ""
-                hours = ""
-                stone = ""
+                viewModel.saveRing(ringDraft.toEntity(cycleId, ring))
             }
             OutlinedButton(
                 onClick = {
                     val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CALENDAR) == PackageManager.PERMISSION_GRANTED
-                    if (!granted) permission.launch(Manifest.permission.WRITE_CALENDAR) else insertCrystal(context, hours.toDoubleOrNull() ?: 2.0)
+                    if (!granted) {
+                        permission.launch(Manifest.permission.WRITE_CALENDAR)
+                    } else {
+                        insertCrystal(context, ringDraft.hoursPerWeek.toDoubleOrNull() ?: 2.0)
+                    }
                 },
                 modifier = Modifier.fillMaxWidth(),
             ) {
