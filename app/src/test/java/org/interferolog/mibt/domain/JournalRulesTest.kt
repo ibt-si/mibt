@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Vadim N. Cherashev
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package org.interferolog.mibt.domain
 
 import org.interferolog.mibt.content.JournalCanon

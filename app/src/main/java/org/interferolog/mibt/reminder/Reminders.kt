@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Vadim N. Cherashev
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package org.interferolog.mibt.reminder
 
 import android.app.AlarmManager

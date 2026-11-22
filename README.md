@@ -196,6 +196,14 @@ Configure these repository secrets (Settings → Secrets and variables → Actio
 
 The workflow writes a temporary `keystore.properties` from these secrets and never commits it. Without them the job fails early with an explicit error rather than publishing an unsigned APK.
 
+## License
+
+Copyright (C) 2026 Vadim N. Cherashev.
+
+MiBT is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, **either version 3 of the License, or (at your option) any later version** ([SPDX: `GPL-3.0-or-later`](https://spdx.org/licenses/GPL-3.0-or-later.html)).
+
+It is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See [LICENSE](LICENSE) for the full text of the license. The source code is available at [github.com/ibt-si/fibt](https://github.com/ibt-si/fibt).
+
 <a id="русский"></a>
 
 # MiBT — «Бортовой журнал: Физика денег по ТИС»
@@ -391,3 +399,11 @@ Release-сборки подписываются из не отслеживаем
 | `ANDROID_KEY_PASSWORD` | `keyPassword` из локального `keystore.properties` |
 
 Workflow создаёт временный `keystore.properties` из этих секретов и не добавляет его в git. Без секретов задача сразу завершается с понятной ошибкой и не публикует неподписанный APK.
+
+## Лицензия
+
+Copyright (C) 2026 Vadim N. Cherashev.
+
+MiBT — свободное программное обеспечение: вы можете распространять и/или изменять его на условиях GNU General Public License Фонда свободного программного обеспечения, **версии 3 или (по вашему выбору) любой более поздней версии** ([SPDX: `GPL-3.0-or-later`](https://spdx.org/licenses/GPL-3.0-or-later.html)).
+
+Программа распространяется в надежде, что она будет полезной, но БЕЗ КАКИХ-ЛИБО ГАРАНТИЙ; в том числе без гарантии пригодности для конкретных целей. Полный текст лицензии приведён в файле [LICENSE](LICENSE). Исходный код доступен по адресу [github.com/ibt-si/fibt](https://github.com/ibt-si/fibt).
