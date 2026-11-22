@@ -163,7 +163,7 @@ fun MaintenanceScreen(viewModel: JournalViewModel, backStack: NavBackStack<NavKe
 @Composable
 fun ScriptsScreen() {
     ScreenColumn {
-        MetaText("Где в журнале есть готовая фраза, она приведена дословно.")
+        MetaText("Реплики приведены дословно по главам книги.")
         JournalCanon.scripts.forEach { card ->
             SectionCard(tone = if (card.quoted) CardTone.Primary else CardTone.Surface) {
                 Text(card.title, style = MaterialTheme.typography.titleMedium)
