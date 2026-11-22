@@ -121,6 +121,10 @@ class JournalViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun deleteDiary(id: Long) {
+        viewModelScope.launch { repo.deleteDiary(id) }
+    }
+
     fun saveWell(situation: String, amount: Long?, question: String, spasm: String, effect: String) {
         val cycle = ui.value.cycle ?: return
         viewModelScope.launch {
@@ -137,6 +141,10 @@ class JournalViewModel(app: Application) : AndroidViewModel(app) {
             )
             _notice.value = "Запись Точки C сохранена."
         }
+    }
+
+    fun deleteWell(id: Long) {
+        viewModelScope.launch { repo.deleteWell(id) }
     }
 
     fun saveSpend(node: String, amount: Long, note: String, cleanSheet: Boolean, canFundMirror: Boolean) {

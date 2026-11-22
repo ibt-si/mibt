@@ -54,6 +54,7 @@ import kotlinx.coroutines.launch
 import org.interferolog.mibt.JournalViewModel
 import org.interferolog.mibt.activeAttempt
 import org.interferolog.mibt.content.CALC_DISCLAIMER
+import org.interferolog.mibt.content.BlankCanon
 import org.interferolog.mibt.content.JournalCanon
 import org.interferolog.mibt.content.POINT_C
 import org.interferolog.mibt.content.WeekCanon
@@ -676,13 +677,13 @@ private fun BlankLinks(
             if (includeInlineEditor) {
                 BodyText("Бланк 1. Дневник фазы. Запись паузы — кнопка «Пауза». Она не проходит через минуту тишины.")
             }
-            WeekLink("Открыть паузу") { backStack.reveal(PauseRoute) }
+            WeekLink(BlankCanon.phaseDiary.title) { backStack.reveal(PauseRoute) }
         }
         2 -> {
             if (includeInlineEditor) {
                 BodyText("Бланк 2а. Колодец или Точка C. Три напоминания ставятся здесь и остаются тихими.")
             }
-            WeekLink("Открыть Точку C") { backStack.reveal(PointCRoute) }
+            WeekLink(BlankCanon.pointC.title) { backStack.reveal(PointCRoute) }
             if (includeInlineEditor) {
                 ReminderEditor(viewModel)
             }
@@ -727,13 +728,14 @@ private fun WeekLink(label: String, onClick: () -> Unit) {
     TonalButton(text = label, modifier = Modifier.fillMaxWidth(), onClick = onClick)
 }
 
+internal fun impulseShareLine(entries: Int, empty: Int): String? {
+    if (entries == 0) return null
+    return "Доля импульсов из пустоты: ${formatRatio(empty.toDouble() / entries)}."
+}
+
 private fun liveCalculation(ui: JournalUi, number: Int): String {
     return when (number) {
-        1 -> {
-            val all = ui.diary.size
-            val empty = ui.diary.count { it.impulse == "EMPTY" }
-            if (all == 0) "Записей пока нет." else "Доля импульсов из пустоты: ${formatRatio(empty.toDouble() / all)}."
-        }
+        1 -> impulseShareLine(ui.diary.size, ui.diary.count { it.impulse == "EMPTY" }) ?: "Записей пока нет."
         2 -> {
             val all = ui.wells.size
             val well = ui.wells.count { it.question == "WELL" }

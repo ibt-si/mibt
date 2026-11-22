@@ -32,9 +32,12 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
 import org.interferolog.mibt.JournalViewModel
+import org.interferolog.mibt.content.BlankCanon
 import org.interferolog.mibt.content.JournalCanon
 import org.interferolog.mibt.content.POINT_C
 import org.interferolog.mibt.data.JournalUi
+import org.interferolog.mibt.data.PhaseDiaryEntryEntity
+import org.interferolog.mibt.data.WellEntryEntity
 import org.interferolog.mibt.domain.etaBand
 import org.interferolog.mibt.domain.etaBandLabel
 import org.interferolog.mibt.domain.formatRatio
@@ -43,6 +46,7 @@ import org.interferolog.mibt.domain.parseRubles
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 @Composable
 fun CaptureScreen(viewModel: JournalViewModel) {
@@ -51,6 +55,7 @@ fun CaptureScreen(viewModel: JournalViewModel) {
         NoCycleNotice()
         return
     }
+    val blank = BlankCanon.phaseDiary
     var amount by remember { mutableStateOf("") }
     var context by remember { mutableStateOf("") }
     var body by remember { mutableStateOf("") }
@@ -65,6 +70,7 @@ fun CaptureScreen(viewModel: JournalViewModel) {
     }
 
     ScreenColumn {
+        BlankHeader(blank)
         QuietCard("Время запишется в момент выбора. Минута тишины здесь не нужна.", CardTone.Secondary)
         SectionCard {
             Field("Сумма", amount, { amount = it }, number = true, suffix = "₽")
@@ -78,34 +84,14 @@ fun CaptureScreen(viewModel: JournalViewModel) {
                 ),
             )
         }
-        val recent = ui.diary.take(5)
-        if (recent.isNotEmpty()) {
-            SectionHeader("Последние записи")
-            SegmentedGroup(count = recent.size) { index, shape ->
-                val entry = recent[index]
-                val isEmpty = entry.impulse == "EMPTY"
-                ListItem(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(shape),
-                    leadingContent = {
-                        ToneBadge(
-                            text = if (isEmpty) "П" else "Н",
-                            tone = if (isEmpty) CardTone.Tertiary else CardTone.Primary,
-                        )
-                    },
-                    supportingContent = entry.bodyMarker.takeIf { it.isNotBlank() }?.let { { Text(it) } },
-                    colors = ListItemDefaults.colors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                    ),
-                    content = {
-                        Text(
-                            "${entry.amountKopecks?.let(::formatRubles) ?: "без суммы"} · ${entry.context.ifBlank { "без контекста" }}",
-                        )
-                    },
-                )
-            }
-        }
+        blank.referenceTables.forEach { ReferenceTable(it) }
+        ExampleRows(blank.columns, blank.examples)
+        impulseShareLine(ui.diary.size, ui.diary.count { it.impulse == "EMPTY" })?.let { MetaText(it) }
+        EntryList(
+            columns = blank.columns,
+            entries = ui.diary.sortedByDescending { it.atMillis }.map { EntryLine(it.id, diaryCells(it)) },
+            onDelete = viewModel::deleteDiary,
+        )
     }
 }
 
@@ -116,6 +102,7 @@ fun PointCScreen(viewModel: JournalViewModel) {
         NoCycleNotice()
         return
     }
+    val blank = BlankCanon.pointC
     var situation by remember { mutableStateOf("") }
     var amount by remember { mutableStateOf("") }
     var question by remember { mutableStateOf("POINT_C") }
@@ -123,6 +110,7 @@ fun PointCScreen(viewModel: JournalViewModel) {
     var effect by remember { mutableStateOf("") }
 
     ScreenColumn {
+        BlankHeader(blank)
         QuietCard(POINT_C, CardTone.Primary)
         SectionCard {
             Field("Ситуация", situation, { situation = it })
@@ -148,37 +136,13 @@ fun PointCScreen(viewModel: JournalViewModel) {
                 effect = ""
             }
         }
-        val recent = ui.wells.take(5)
-        if (recent.isNotEmpty()) {
-            SectionHeader("Последние записи")
-            SegmentedGroup(count = recent.size) { index, shape ->
-                val entry = recent[index]
-                val isWell = entry.question == "WELL"
-                ListItem(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(shape),
-                    leadingContent = {
-                        ToneBadge(
-                            text = if (isWell) "Колодец" else "Точка C",
-                            tone = if (isWell) CardTone.Tertiary else CardTone.Primary,
-                        )
-                    },
-                    supportingContent = {
-                        Text(
-                            buildString {
-                                append(entry.spasm)
-                                entry.amountKopecks?.let { append(" · ${formatRubles(it)}") }
-                            },
-                        )
-                    },
-                    colors = ListItemDefaults.colors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                    ),
-                    content = { Text(entry.situation.ifBlank { "Без описания" }) },
-                )
-            }
-        }
+        blank.referenceTables.forEach { ReferenceTable(it) }
+        ExampleRows(blank.columns, blank.examples)
+        EntryList(
+            columns = blank.columns,
+            entries = ui.wells.sortedByDescending { it.atMillis }.map { EntryLine(it.id, wellCells(it)) },
+            onDelete = viewModel::deleteWell,
+        )
     }
 }
 
@@ -369,6 +333,43 @@ private fun SpendForm(viewModel: JournalViewModel, cleanSheet: Boolean, title: S
         }
     }
 }
+
+private val entryTime: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")
+
+private fun formatEntryTime(millis: Long): String =
+    entryTime.format(Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()))
+
+private fun withAmount(text: String, amountKopecks: Long?): String {
+    val money = amountKopecks?.let(::formatRubles)
+    return listOf(text.trim(), money)
+        .filter { !it.isNullOrBlank() }
+        .joinToString(", ")
+        .ifBlank { "—" }
+}
+
+private fun diaryCells(entry: PhaseDiaryEntryEntity): List<String> = listOf(
+    formatEntryTime(entry.atMillis),
+    withAmount(entry.context, entry.amountKopecks),
+    entry.bodyMarker.ifBlank { "—" },
+    when (entry.impulse) {
+        "EMPTY" -> "П"
+        "FULL" -> "Н"
+        else -> entry.impulse
+    },
+    entry.fact.ifBlank { "—" },
+)
+
+private fun wellCells(entry: WellEntryEntity): List<String> = listOf(
+    formatEntryTime(entry.atMillis),
+    withAmount(entry.situation, entry.amountKopecks),
+    when (entry.question) {
+        "WELL" -> "Колодец"
+        "POINT_C" -> "Точка C"
+        else -> entry.question
+    },
+    entry.spasm.ifBlank { "—" },
+    entry.pauseEffect.ifBlank { "—" },
+)
 
 private fun missedDays(ui: JournalUi): Int {
     if (ui.spends.isEmpty()) return 0
