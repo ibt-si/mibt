@@ -119,7 +119,7 @@ The specification of the digital log is part of the book’s “Flight log”.
 ## Stack
 
 - Language: Kotlin
-- Platform: Android, `minSdk` 24 (API 24+), `targetSdk`/`compileSdk` 37
+- Platform: Android, `minSdk` 24 (API 24+)
 - UI: Jetpack Compose (Compose UI, Material 3 Expressive), Navigation 3
 - Persistence: Room
 - Widget: Jetpack Glance 1.2.0 (home-screen widget “3-second pause”)
@@ -161,7 +161,7 @@ The app also has three silent daily Point C reminders and a Markdown telemetry e
 
 ## Build and run
 
-JDK 21 is required. Core library desugaring is enabled so `java.time` works on API 24–25. From the repository root:
+JDK 21 is required. From the repository root:
 
 ```bash
 ./gradlew assembleDebug
@@ -178,23 +178,6 @@ Other tasks that exist in this Gradle setup:
 ./gradlew assembleRelease    # minify and resource shrinking are on; signed via keystore.properties
 ./gradlew test               # unit tests of the :app module
 ```
-
-There is a Unix `gradlew` wrapper in the repository. A `gradlew.bat` file is not present.
-
-## Releases
-
-Every push to `master` runs the **Release APK** workflow (`.github/workflows/release.yml`). It reads `versionCode` and `versionName` from `app/build.gradle.kts`; when they change, it builds a signed release APK and publishes it as a GitHub Release with a SHA-256 checksum. The release tag is `v<versionName>-<versionCode>` (for example, `v1.0-1`), so pushing again without a version bump is a no-op. The workflow can also be started manually from the Actions tab; enable **force** to replace the APK of an existing release.
-
-Configure these repository secrets (Settings → Secrets and variables → Actions) before the first run:
-
-| Secret | Value |
-| --- | --- |
-| `ANDROID_KEYSTORE_BASE64` | The release `.jks` keystore, base64-encoded (e.g. `base64 -w0 mibt-release.jks`) |
-| `ANDROID_KEYSTORE_PASSWORD` | `storePassword` from your local `keystore.properties` |
-| `ANDROID_KEY_ALIAS` | `keyAlias` from your local `keystore.properties` |
-| `ANDROID_KEY_PASSWORD` | `keyPassword` from your local `keystore.properties` |
-
-The workflow writes a temporary `keystore.properties` from these secrets and never commits it. Without them the job fails early with an explicit error rather than publishing an unsigned APK.
 
 ## License
 
@@ -323,7 +306,7 @@ Android-приложение к книге Вадима Н. Черашева «�
 ## Стек
 
 - Язык: Kotlin
-- Платформа: Android, `minSdk` 24 (API 24+), `targetSdk`/`compileSdk` 37
+- Платформа: Android, `minSdk` 24 (API 24+)
 - Интерфейс: Jetpack Compose (Compose UI, Material 3 Expressive), Navigation 3
 - БД: Room
 - Виджет: Jetpack Glance (Виджет «Пауза 3 секунды»)
@@ -365,7 +348,7 @@ Android-приложение к книге Вадима Н. Черашева «�
 
 ## Сборка и запуск
 
-Нужен JDK 21. Включено десугарирование JDK, чтобы `java.time` работал на API 24–25. Из корня репозитория:
+Нужен JDK 21. Из корня репозитория:
 
 ```bash
 ./gradlew assembleDebug
@@ -382,23 +365,6 @@ Release-сборки подписываются из не отслеживаем
 ./gradlew assembleRelease    # включены minify и сжатие ресурсов; подпись из keystore.properties
 ./gradlew test               # юнит-тесты модуля :app
 ```
-
-В репозитории есть Unix-обёртка `gradlew`. Файла `gradlew.bat` нет.
-
-## Выпуски (Releases)
-
-При каждом push в `master` запускается workflow **Release APK** (`.github/workflows/release.yml`). Он считывает `versionCode` и `versionName` из `app/build.gradle.kts`; если версия изменилась, собирается подписанный release APK и публикуется как GitHub Release с контрольной суммой SHA-256. Тег выпуска имеет вид `v<versionName>-<versionCode>` (например, `v1.0-1`), поэтому повторная отправка без изменения версии ничего не делает. Workflow можно запустить вручную во вкладке Actions; включите **force**, чтобы заменить APK уже существующего выпуска.
-
-Перед первым запуском настройте секреты репозитория (Settings → Secrets and variables → Actions):
-
-| Секрет | Значение |
-| --- | --- |
-| `ANDROID_KEYSTORE_BASE64` | Релизный `.jks`, закодированный в base64 (например, `base64 -w0 mibt-release.jks`) |
-| `ANDROID_KEYSTORE_PASSWORD` | `storePassword` из локального `keystore.properties` |
-| `ANDROID_KEY_ALIAS` | `keyAlias` из локального `keystore.properties` |
-| `ANDROID_KEY_PASSWORD` | `keyPassword` из локального `keystore.properties` |
-
-Workflow создаёт временный `keystore.properties` из этих секретов и не добавляет его в git. Без секретов задача сразу завершается с понятной ошибкой и не публикует неподписанный APK.
 
 ## Лицензия
 
