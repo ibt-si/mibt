@@ -75,7 +75,7 @@ jobs:
 
       - name: Set up Gradle
         if: steps.check.outputs.publish == 'true'
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       - name: Restore release signing key
         if: steps.check.outputs.publish == 'true'
