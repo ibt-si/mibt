@@ -162,6 +162,15 @@ class JournalRulesTest {
     }
 
     @Test
+    fun weekStepsNameTheChapterAfterEveryScriptReference() {
+        val truncated = Regex("""скрипт\S* \d+ главы(?! \d)""")
+        val offenders = JournalCanon.weeks.flatMap { week ->
+            week.steps.filter { truncated.containsMatchIn(it) }
+        }
+        assertEquals(emptyList<String>(), offenders)
+    }
+
+    @Test
     fun markerRepairAddressesTheWeekThatBuiltTheNode() {
         assertEquals(1, repairWeekForMarker(1))
         assertEquals(3, repairWeekForMarker(2))
