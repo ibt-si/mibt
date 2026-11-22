@@ -153,14 +153,12 @@ jobs:
 
           apk_name="mibt-${VERSION_NAME}-${VERSION_CODE}-release.apk"
           cp "${apks[0]}" "$SIGNING_DIR/$apk_name"
-          (cd "$SIGNING_DIR" && sha256sum "$apk_name" > "$apk_name.sha256")
 
           cat > "$SIGNING_DIR/release-notes.md" <<EOF
           - [Скачать APK](https://github.com/${REPOSITORY}/releases/download/${TAG}/${apk_name})
           EOF
 
           echo "apk=$SIGNING_DIR/$apk_name" >> "$GITHUB_OUTPUT"
-          echo "checksum=$SIGNING_DIR/$apk_name.sha256" >> "$GITHUB_OUTPUT"
           echo "notes=$SIGNING_DIR/release-notes.md" >> "$GITHUB_OUTPUT"
 
       - name: Publish GitHub release
@@ -171,20 +169,19 @@ jobs:
           TITLE: MiBT ${{ steps.version.outputs.name }}
           EXISTS: ${{ steps.check.outputs.exists }}
           APK: ${{ steps.package.outputs.apk }}
-          CHECKSUM: ${{ steps.package.outputs.checksum }}
           NOTES: ${{ steps.package.outputs.notes }}
           COMMIT: ${{ github.sha }}
         run: |
           set -euo pipefail
           if [[ "$EXISTS" == "true" ]]; then
-            gh release upload "$TAG" "$APK" "$CHECKSUM" --clobber
+            gh release upload "$TAG" "$APK" --clobber
           else
             # --target only applies when gh has to create the tag itself.
             target_args=(--target "$COMMIT")
             if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
               target_args=()
             fi
-            gh release create "$TAG" "$APK" "$CHECKSUM" \
+            gh release create "$TAG" "$APK" \
               "${target_args[@]}" \
               --title "$TITLE" \
               --notes-file "$NOTES"
