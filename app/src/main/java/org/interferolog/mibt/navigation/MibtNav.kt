@@ -58,6 +58,7 @@ import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -189,6 +190,13 @@ fun MibtNav(viewModel: JournalViewModel, openToken: Int, openTarget: String?) {
     val subtitle = screenSubtitle(top, week, !hasCycle, title)
     val bottomClearance = if (showFloatingToolbar || showStandaloneFab) 104.dp else 16.dp
 
+    // The collapsed row is only 64.dp and its title style is sized for a single line, so a
+    // two-line title there crushes the subtitle against the tabs. Material 3's own collapsed
+    // title is one line with ellipsis; keep the full two-line title for the expanded row only.
+    val titleExpanded by remember {
+        derivedStateOf { topBarScrollBehavior.state.collapsedFraction < 0.5f }
+    }
+
     Scaffold(
         modifier = Modifier
             .nestedScroll(topBarScrollBehavior.nestedScrollConnection)
@@ -207,7 +215,13 @@ fun MibtNav(viewModel: JournalViewModel, openToken: Int, openTarget: String?) {
         },
         topBar = {
             LargeFlexibleTopAppBar(
-                title = { Text(title, maxLines = 2, overflow = TextOverflow.Ellipsis) },
+                title = {
+                    Text(
+                        title,
+                        maxLines = if (titleExpanded) 2 else 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                },
                 subtitle = { Text(subtitle, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 scrollBehavior = topBarScrollBehavior,
                 navigationIcon = {
