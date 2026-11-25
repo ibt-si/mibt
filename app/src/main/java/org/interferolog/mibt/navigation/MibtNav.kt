@@ -3,6 +3,7 @@
 
 package org.interferolog.mibt.navigation
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,13 +30,14 @@ import androidx.compose.material.icons.outlined.Today as OutlinedToday
 import androidx.compose.material.icons.outlined.Tune as OutlinedTune
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingToolbarDefaults
 import androidx.compose.material3.FloatingToolbarExitDirection
 import androidx.compose.material3.HorizontalFloatingToolbar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
@@ -58,8 +60,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -348,14 +353,39 @@ private fun ToolbarDestination(
     outlined: ImageVector,
     onClick: () -> Unit,
 ) {
-    if (selected) {
-        FilledTonalIconButton(onClick = onClick) {
-            Icon(filled, contentDescription = label)
-        }
-    } else {
-        IconButton(onClick = onClick) {
-            Icon(outlined, contentDescription = label)
-        }
+    val isSelected = selected
+    val motionScheme = MaterialTheme.motionScheme
+    val containerColor by animateColorAsState(
+        targetValue = if (isSelected) {
+            MaterialTheme.colorScheme.secondaryContainer
+        } else {
+            Color.Transparent
+        },
+        animationSpec = motionScheme.defaultEffectsSpec(),
+        label = "toolbarDestinationContainer",
+    )
+    val contentColor by animateColorAsState(
+        targetValue = if (isSelected) {
+            MaterialTheme.colorScheme.onSecondaryContainer
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        },
+        animationSpec = motionScheme.defaultEffectsSpec(),
+        label = "toolbarDestinationContent",
+    )
+    IconToggleButton(
+        checked = isSelected,
+        onCheckedChange = { checked -> if (checked) onClick() },
+        shapes = IconButtonDefaults.toggleableShapes(),
+        modifier = Modifier.semantics { set(SemanticsProperties.Selected, isSelected) },
+        colors = IconButtonDefaults.iconToggleButtonColors(
+            containerColor = containerColor,
+            contentColor = contentColor,
+            checkedContainerColor = containerColor,
+            checkedContentColor = contentColor,
+        ),
+    ) {
+        Icon(if (isSelected) filled else outlined, contentDescription = label)
     }
 }
 
