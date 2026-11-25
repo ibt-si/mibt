@@ -4,7 +4,8 @@
 package org.interferolog.mibt.data
 
 import org.interferolog.mibt.content.BlankCanon
-import org.interferolog.mibt.domain.formatRubles
+import org.interferolog.mibt.domain.CurrencyChoice
+import org.interferolog.mibt.domain.formatMoney
 import org.interferolog.mibt.domain.routeTitle
 import org.interferolog.mibt.domain.RouteKind
 import java.time.Instant
@@ -40,7 +41,13 @@ data class TelemetrySnapshot(
     val markers: List<MarkerCheckEntity>,
 )
 
-fun exportTelemetry(snapshot: TelemetrySnapshot, zone: ZoneId = ZoneId.systemDefault()): String {
+fun exportTelemetry(
+    snapshot: TelemetrySnapshot,
+    currency: CurrencyChoice? = null,
+    zone: ZoneId = ZoneId.systemDefault(),
+): String {
+    val moneyCurrency = currency ?: CurrencyChoice.fromCode(snapshot.cycle?.currency ?: "RUB")
+    fun money(minor: Long) = formatMoney(minor, moneyCurrency)
     val time = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(zone)
     fun at(millis: Long) = time.format(Instant.ofEpochMilli(millis))
     val lines = mutableListOf<String>()
@@ -85,7 +92,7 @@ fun exportTelemetry(snapshot: TelemetrySnapshot, zone: ZoneId = ZoneId.systemDef
     lines += ""
     lines += "## ${BlankCanon.phaseDiary.title}"
     tableOrEmpty(lines, snapshot.diary) { entry ->
-        "| ${at(entry.atMillis)} | ${entry.amountKopecks?.let(::formatRubles) ?: "—"} | ${entry.impulse} | ${entry.bodyMarker} | ${entry.context} | ${entry.fact} |"
+        "| ${at(entry.atMillis)} | ${entry.amountKopecks?.let(::money) ?: "—"} | ${entry.impulse} | ${entry.bodyMarker} | ${entry.context} | ${entry.fact} |"
     }
     lines += ""
     lines += "## ${BlankCanon.pointC.title}"
@@ -95,17 +102,17 @@ fun exportTelemetry(snapshot: TelemetrySnapshot, zone: ZoneId = ZoneId.systemDef
     lines += ""
     lines += "## ${BlankCanon.holter.title}"
     tableOrEmpty(lines, snapshot.spends) { entry ->
-        "| ${at(entry.atMillis)} | ${entry.node} | ${formatRubles(entry.amountKopecks)} | ${if (entry.cleanSheet) "чистый лист" else ""} | ${entry.note} |"
+        "| ${at(entry.atMillis)} | ${entry.node} | ${money(entry.amountKopecks)} | ${if (entry.cleanSheet) "чистый лист" else ""} | ${entry.note} |"
     }
     lines += ""
     lines += "## Зеркальные счета"
     tableOrEmpty(lines, snapshot.bills) { bill ->
-        "| ${formatRubles(bill.amountKopecks)} | открыт ${at(bill.openedAt)} | ${bill.settledAt?.let { "перевод ${at(it)}" } ?: "открыт"} |"
+        "| ${money(bill.amountKopecks)} | открыт ${at(bill.openedAt)} | ${bill.settledAt?.let { "перевод ${at(it)}" } ?: "открыт"} |"
     }
     lines += ""
     lines += "## ${BlankCanon.sources.title}"
     tableOrEmpty(lines, snapshot.sources) { source ->
-        "| ${source.name} | ${formatRubles(source.netIncomeKopecks)} | ${source.contractHours}+${source.frictionHours} ч | R ${source.frictionScore} |"
+        "| ${source.name} | ${money(source.netIncomeKopecks)} | ${source.contractHours}+${source.frictionHours} ч | R ${source.frictionScore} |"
     }
     lines += ""
     lines += "## Тренажёр цены"
@@ -123,10 +130,10 @@ fun exportTelemetry(snapshot: TelemetrySnapshot, zone: ZoneId = ZoneId.systemDef
     val family = snapshot.family
     if (family == null) lines += "Записей нет."
     else {
-        lines += "- Доходы: ${formatRubles(family.income1)} и ${formatRubles(family.income2)}"
-        lines += "- Фундамент: ${formatRubles(family.foundation)}"
-        lines += "- Фонд / личные доли: ${formatRubles(family.targetFund)} / ${formatRubles(family.personal1)} / ${formatRubles(family.personal2)}"
-        lines += "- Порог: ${formatRubles(family.threshold)}"
+        lines += "- Доходы: ${money(family.income1)} и ${money(family.income2)}"
+        lines += "- Фундамент: ${money(family.foundation)}"
+        lines += "- Фонд / личные доли: ${money(family.targetFund)} / ${money(family.personal1)} / ${money(family.personal2)}"
+        lines += "- Порог: ${money(family.threshold)}"
         lines += "- Фраза: ${family.phrase}"
         if (family.saturdayNote.isNotBlank()) lines += "- Субботняя сверка: ${family.saturdayNote}"
     }
@@ -135,22 +142,22 @@ fun exportTelemetry(snapshot: TelemetrySnapshot, zone: ZoneId = ZoneId.systemDef
     val rest = snapshot.rest
     if (rest == null) lines += "Записей нет."
     else {
-        lines += "- Опора ${formatRubles(rest.support)}, Инструмент ${formatRubles(rest.tool)}, Обз ${formatRubles(rest.obligations)}"
-        lines += "- Масса покоя: ${formatRubles(rest.balance)}"
+        lines += "- Опора ${money(rest.support)}, Инструмент ${money(rest.tool)}, Обз ${money(rest.obligations)}"
+        lines += "- Масса покоя: ${money(rest.balance)}"
         lines += "- Профиль: ${rest.profile}, первое сечение ${rest.firstCutPercent}%"
         lines += "- Счёт открыт: ${yesNo(rest.accountOpened)}, очередь: ${rest.strategy}"
     }
     tableOrEmpty(lines, snapshot.debts) { debt ->
-        "| ${debt.name} | ${formatRubles(debt.balance)} | ${debt.ratePercent}% | минимум ${formatRubles(debt.minPayment)} |"
+        "| ${debt.name} | ${money(debt.balance)} | ${debt.ratePercent}% | минимум ${money(debt.minPayment)} |"
     }
     lines += ""
     lines += "## Бланк 6. Карта кризиса"
     val crisis = snapshot.crisis
     if (crisis == null) lines += "Записей нет."
     else {
-        lines += "- Доступно: ${formatRubles(crisis.accessible)}"
-        lines += "- Штатный минимум: ${formatRubles(crisis.staffMinimum)}"
-        lines += "- Аварийный минимум: ${formatRubles(crisis.emergencyMinimum)}"
+        lines += "- Доступно: ${money(crisis.accessible)}"
+        lines += "- Штатный минимум: ${money(crisis.staffMinimum)}"
+        lines += "- Аварийный минимум: ${money(crisis.emergencyMinimum)}"
         lines += "- Отсечение: ${crisis.cutList}"
         lines += "- Кольцо опоры: ${crisis.supportRing}"
         lines += "- Быстрый контур: ${crisis.offers}"
@@ -160,7 +167,7 @@ fun exportTelemetry(snapshot: TelemetrySnapshot, zone: ZoneId = ZoneId.systemDef
         "| ${item.kind} | ${at(item.startedAt)} — ${at(item.endsAt)} | ${item.reason} |"
     }
     tableOrEmpty(lines, snapshot.tranches) { item ->
-        "| ${at(item.atMillis)} | ${formatRubles(item.amount)} | запас ${item.runwayMonths} мес. |"
+        "| ${at(item.atMillis)} | ${money(item.amount)} | запас ${item.runwayMonths} мес. |"
     }
     lines += ""
     lines += "## Бланк 7. Веер"
@@ -180,7 +187,7 @@ fun exportTelemetry(snapshot: TelemetrySnapshot, zone: ZoneId = ZoneId.systemDef
         lines += passport.riskLimit
         lines += passport.stormRule
         lines += passport.hygiene
-        lines += "- Счёт: ${formatRubles(passport.accountBalance)}, взнос ${formatRubles(passport.monthlyContribution)}"
+        lines += "- Счёт: ${money(passport.accountBalance)}, взнос ${money(passport.monthlyContribution)}"
         lines += "- Стресс-тест 50%: ${yesNo(passport.drawdownOk)}"
     }
     lines += ""

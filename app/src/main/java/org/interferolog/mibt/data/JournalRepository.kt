@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import org.interferolog.mibt.domain.CurrencyChoice
 import org.interferolog.mibt.domain.Letter
 import org.interferolog.mibt.domain.PhaseAnswers
 import org.interferolog.mibt.domain.PlannedRoute
@@ -44,6 +45,7 @@ data class JournalUi(
     val maintenance: List<MaintenanceLogEntity> = emptyList(),
     val markers: List<MarkerCheckEntity> = emptyList(),
     val reminders: ReminderPlanEntity? = null,
+    val settings: AppSettingsEntity? = null,
     val fullCycleAlreadyCompleted: Boolean = false,
 )
 
@@ -54,16 +56,21 @@ class JournalRepository(private val db: MibtDatabase) {
     fun observe(): Flow<JournalUi> = combine(
         dao.observeActiveCycle(),
         dao.observeReminder(),
-    ) { cycle, reminders -> cycle to reminders }
-        .flatMapLatest { (cycle, reminders) ->
+        dao.observeSettings(),
+    ) { cycle, reminders, settings -> Triple(cycle, reminders, settings) }
+        .flatMapLatest { (cycle, reminders, settings) ->
             if (cycle == null) {
-                flowOf(JournalUi(reminders = reminders))
+                flowOf(JournalUi(reminders = reminders, settings = settings))
             } else {
-                observeCycle(cycle, reminders)
+                observeCycle(cycle, reminders, settings)
             }
         }
 
-    private fun observeCycle(cycle: CycleEntity, reminders: ReminderPlanEntity?): Flow<JournalUi> {
+    private fun observeCycle(
+        cycle: CycleEntity,
+        reminders: ReminderPlanEntity?,
+        settings: AppSettingsEntity?,
+    ): Flow<JournalUi> {
         val id = cycle.id
         val head = combine(
             dao.observeTest(id),
@@ -143,6 +150,7 @@ class JournalRepository(private val db: MibtDatabase) {
                 maintenance = maintenance as List<MaintenanceLogEntity>,
                 markers = markers as List<MarkerCheckEntity>,
                 reminders = reminders,
+                settings = settings,
             )
         }.flatMapLatest { partial ->
             val ids = partial.attempts.map { it.id }
@@ -165,6 +173,9 @@ class JournalRepository(private val db: MibtDatabase) {
                 weekOrder = route.weeks.joinToString(","),
                 status = "ACTIVE",
                 fullCycleCompleted = fullBefore,
+                currency = dao.settings()?.currencyCode
+                    ?.let { CurrencyChoice.fromCode(it).code }
+                    ?: CurrencyChoice.systemDefault().code,
             ),
         )
         dao.insertTest(
@@ -367,6 +378,8 @@ class JournalRepository(private val db: MibtDatabase) {
     suspend fun setMarker(entry: MarkerCheckEntity) = dao.insertMarker(entry)
     suspend fun saveReminder(plan: ReminderPlanEntity) = dao.upsertReminder(plan)
     suspend fun reminder(): ReminderPlanEntity? = dao.reminder()
+    suspend fun saveCurrency(code: String) =
+        dao.upsertSettings(AppSettingsEntity(currencyCode = CurrencyChoice.fromCode(code).code))
     suspend fun setVacation(cycleId: Long, vacation: Boolean) = dao.setVacation(cycleId, vacation)
 
     suspend fun snapshot(cycleId: Long): TelemetrySnapshot {
@@ -401,7 +414,10 @@ class JournalRepository(private val db: MibtDatabase) {
         )
     }
 
-    suspend fun exportText(cycleId: Long): String = exportTelemetry(snapshot(cycleId))
+    suspend fun exportText(cycleId: Long): String {
+        val snap = snapshot(cycleId)
+        return exportTelemetry(snap, CurrencyChoice.fromCode(snap.cycle?.currency ?: "RUB"))
+    }
 }
 
 fun parseLetters(raw: String): List<Letter> = raw.split(",").map { Letter.valueOf(it) }

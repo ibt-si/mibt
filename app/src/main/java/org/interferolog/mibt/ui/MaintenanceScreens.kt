@@ -147,6 +147,9 @@ fun MaintenanceScreen(viewModel: JournalViewModel, backStack: NavBackStack<NavKe
 
         SectionHeader("Инструменты журнала")
         SectionCard {
+            CurrencyEditor(viewModel)
+        }
+        SectionCard {
             TonalButton("Экспорт в Markdown", modifier = Modifier.fillMaxWidth()) {
                 backStack.reveal(ExportRoute)
             }

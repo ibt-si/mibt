@@ -38,6 +38,7 @@ import org.interferolog.mibt.data.TrancheEntity
 import org.interferolog.mibt.data.WeekAttemptEntity
 import org.interferolog.mibt.data.WellEntryEntity
 import org.interferolog.mibt.data.WorkItemEntity
+import org.interferolog.mibt.domain.CurrencyChoice
 import org.interferolog.mibt.domain.Letter
 import org.interferolog.mibt.domain.PhaseAnswers
 import org.interferolog.mibt.reminder.ReminderScheduler
@@ -411,6 +412,10 @@ class JournalViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { repo.setVacation(cycle.id, vacation) }
     }
 
+    fun setCurrency(code: String) {
+        viewModelScope.launch { repo.saveCurrency(code) }
+    }
+
     fun exportTo(uri: Uri) {
         val cycle = ui.value.cycle ?: return
         viewModelScope.launch {
@@ -422,6 +427,10 @@ class JournalViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 }
+
+/** Currency used by the cycle on screen, or by the next cycle when no cycle is open. */
+fun JournalUi.moneyCurrency(): CurrencyChoice =
+    CurrencyChoice.fromCode(cycle?.currency ?: settings?.currencyCode ?: "RUB")
 
 fun JournalUi.activeAttempt(week: Int? = null): WeekAttemptEntity? {
     val cycle = cycle ?: return null

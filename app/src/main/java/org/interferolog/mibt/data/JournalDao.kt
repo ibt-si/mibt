@@ -317,4 +317,13 @@ interface JournalDao {
 
     @Query("SELECT * FROM reminder_plans WHERE id = 1")
     suspend fun reminder(): ReminderPlanEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertSettings(settings: AppSettingsEntity)
+
+    @Query("SELECT * FROM app_settings WHERE id = 1")
+    fun observeSettings(): Flow<AppSettingsEntity?>
+
+    @Query("SELECT * FROM app_settings WHERE id = 1")
+    suspend fun settings(): AppSettingsEntity?
 }

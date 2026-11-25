@@ -3,7 +3,9 @@
 
 package org.interferolog.mibt.data
 
-import org.interferolog.mibt.domain.parseRubles
+import org.interferolog.mibt.domain.CurrencyChoice
+import org.interferolog.mibt.domain.formatMoney
+import org.interferolog.mibt.domain.parseMoney
 
 data class FamilyDraft(
     val income1: String = "",
@@ -16,28 +18,28 @@ data class FamilyDraft(
     val phrase: String = "Я сейчас в сжатии",
     val saturdayNote: String = "",
 ) {
-    fun toEntity(cycleId: Long): FamilyPlanEntity = FamilyPlanEntity(
+    fun toEntity(cycleId: Long, currency: CurrencyChoice = CurrencyChoice.RUB): FamilyPlanEntity = FamilyPlanEntity(
         cycleId = cycleId,
-        income1 = kopecksOf(income1),
-        income2 = kopecksOf(income2),
-        foundation = kopecksOf(foundation),
-        targetFund = kopecksOf(targetFund),
-        personal1 = kopecksOf(personal1),
-        personal2 = kopecksOf(personal2),
-        threshold = kopecksOf(threshold),
+        income1 = minorOf(income1, currency),
+        income2 = minorOf(income2, currency),
+        foundation = minorOf(foundation, currency),
+        targetFund = minorOf(targetFund, currency),
+        personal1 = minorOf(personal1, currency),
+        personal2 = minorOf(personal2, currency),
+        threshold = minorOf(threshold, currency),
         phrase = phrase,
         saturdayNote = saturdayNote,
     )
 }
 
-fun FamilyPlanEntity.toDraft(): FamilyDraft = FamilyDraft(
-    income1 = kopecksInput(income1),
-    income2 = kopecksInput(income2),
-    foundation = kopecksInput(foundation),
-    targetFund = kopecksInput(targetFund),
-    personal1 = kopecksInput(personal1),
-    personal2 = kopecksInput(personal2),
-    threshold = kopecksInput(threshold),
+fun FamilyPlanEntity.toDraft(currency: CurrencyChoice = CurrencyChoice.RUB): FamilyDraft = FamilyDraft(
+    income1 = minorInput(income1, currency),
+    income2 = minorInput(income2, currency),
+    foundation = minorInput(foundation, currency),
+    targetFund = minorInput(targetFund, currency),
+    personal1 = minorInput(personal1, currency),
+    personal2 = minorInput(personal2, currency),
+    threshold = minorInput(threshold, currency),
     phrase = phrase,
     saturdayNote = saturdayNote,
 )
@@ -56,12 +58,16 @@ data class RestDraft(
      * A missing row is the first save from the blank form, which records the account as open.
      * A loaded row keeps [accountOpened] from the draft so a re-save does not flip it.
      */
-    fun toEntity(cycleId: Long, existing: RestMassEntity?): RestMassEntity = RestMassEntity(
+    fun toEntity(
+        cycleId: Long,
+        existing: RestMassEntity?,
+        currency: CurrencyChoice = CurrencyChoice.RUB,
+    ): RestMassEntity = RestMassEntity(
         cycleId = cycleId,
-        support = kopecksOf(support),
-        tool = kopecksOf(tool),
-        obligations = kopecksOf(obligations),
-        balance = kopecksOf(balance),
+        support = minorOf(support, currency),
+        tool = minorOf(tool, currency),
+        obligations = minorOf(obligations, currency),
+        balance = minorOf(balance, currency),
         profile = profile,
         firstCutPercent = doubleOf(firstCutPercent),
         accountOpened = if (existing == null) true else accountOpened,
@@ -69,11 +75,11 @@ data class RestDraft(
     )
 }
 
-fun RestMassEntity.toDraft(): RestDraft = RestDraft(
-    support = kopecksInput(support),
-    tool = kopecksInput(tool),
-    obligations = kopecksInput(obligations),
-    balance = kopecksInput(balance),
+fun RestMassEntity.toDraft(currency: CurrencyChoice = CurrencyChoice.RUB): RestDraft = RestDraft(
+    support = minorInput(support, currency),
+    tool = minorInput(tool, currency),
+    obligations = minorInput(obligations, currency),
+    balance = minorInput(balance, currency),
     profile = profile,
     firstCutPercent = decimalInput(firstCutPercent),
     accountOpened = accountOpened,
@@ -89,11 +95,11 @@ data class CrisisDraft(
     val offers: String = "",
     val drillDone: Boolean = false,
 ) {
-    fun toEntity(cycleId: Long): CrisisMapEntity = CrisisMapEntity(
+    fun toEntity(cycleId: Long, currency: CurrencyChoice = CurrencyChoice.RUB): CrisisMapEntity = CrisisMapEntity(
         cycleId = cycleId,
-        accessible = kopecksOf(accessible),
-        staffMinimum = kopecksOf(staffMinimum),
-        emergencyMinimum = kopecksOf(emergencyMinimum),
+        accessible = minorOf(accessible, currency),
+        staffMinimum = minorOf(staffMinimum, currency),
+        emergencyMinimum = minorOf(emergencyMinimum, currency),
         cutList = cutList,
         supportRing = supportRing,
         offers = offers,
@@ -101,10 +107,10 @@ data class CrisisDraft(
     )
 }
 
-fun CrisisMapEntity.toDraft(): CrisisDraft = CrisisDraft(
-    accessible = kopecksInput(accessible),
-    staffMinimum = kopecksInput(staffMinimum),
-    emergencyMinimum = kopecksInput(emergencyMinimum),
+fun CrisisMapEntity.toDraft(currency: CurrencyChoice = CurrencyChoice.RUB): CrisisDraft = CrisisDraft(
+    accessible = minorInput(accessible, currency),
+    staffMinimum = minorInput(staffMinimum, currency),
+    emergencyMinimum = minorInput(emergencyMinimum, currency),
     cutList = cutList,
     supportRing = supportRing,
     offers = offers,
@@ -150,7 +156,7 @@ data class PassportDraft(
         else -> this
     }
 
-    fun toEntity(cycleId: Long): InvestmentPassportEntity = InvestmentPassportEntity(
+    fun toEntity(cycleId: Long, currency: CurrencyChoice = CurrencyChoice.RUB): InvestmentPassportEntity = InvestmentPassportEntity(
         cycleId = cycleId,
         massStatus = massStatus,
         contributionRule = contributionRule,
@@ -159,8 +165,8 @@ data class PassportDraft(
         riskLimit = riskLimit,
         stormRule = stormRule,
         hygiene = hygiene,
-        accountBalance = kopecksOf(accountBalance),
-        monthlyContribution = kopecksOf(monthlyContribution),
+        accountBalance = minorOf(accountBalance, currency),
+        monthlyContribution = minorOf(monthlyContribution, currency),
         annualRate = doubleOf(annualRatePercent) / 100.0,
         years = intOf(years),
         reinvestPercent = doubleOf(reinvestPercent),
@@ -170,7 +176,7 @@ data class PassportDraft(
     )
 }
 
-fun InvestmentPassportEntity.toDraft(): PassportDraft = PassportDraft(
+fun InvestmentPassportEntity.toDraft(currency: CurrencyChoice = CurrencyChoice.RUB): PassportDraft = PassportDraft(
     massStatus = massStatus,
     contributionRule = contributionRule,
     horizonRule = horizonRule,
@@ -178,8 +184,8 @@ fun InvestmentPassportEntity.toDraft(): PassportDraft = PassportDraft(
     riskLimit = riskLimit,
     stormRule = stormRule,
     hygiene = hygiene,
-    accountBalance = kopecksInput(accountBalance),
-    monthlyContribution = kopecksInput(monthlyContribution),
+    accountBalance = minorInput(accountBalance, currency),
+    monthlyContribution = minorInput(monthlyContribution, currency),
     annualRatePercent = percentInput(annualRate),
     years = years.toString(),
     reinvestPercent = decimalInput(reinvestPercent),
@@ -257,16 +263,10 @@ fun MeaningRingEntity.toDraft(): RingDraft = RingDraft(
     firstStone = firstStone,
 )
 
-private fun kopecksOf(text: String): Long = parseRubles(text) ?: 0
+private fun minorOf(text: String, currency: CurrencyChoice): Long = parseMoney(text, currency) ?: 0
 
-private fun kopecksInput(kopecks: Long): String {
-    val sign = if (kopecks < 0) "-" else ""
-    val value = kotlin.math.abs(kopecks)
-    val rubles = value / 100
-    val kop = (value % 100).toInt()
-    val body = if (kop == 0) rubles.toString() else "$rubles,${kop.toString().padStart(2, '0')}"
-    return sign + body
-}
+private fun minorInput(minor: Long, currency: CurrencyChoice): String =
+    formatMoney(minor, currency).removeSuffix(" ${currency.symbol}")
 
 private fun doubleOf(text: String): Double = text.toDoubleOrNull() ?: 0.0
 

@@ -75,6 +75,7 @@ import org.interferolog.mibt.JournalViewModel
 import org.interferolog.mibt.content.BlankCanon
 import org.interferolog.mibt.content.JournalCanon
 import org.interferolog.mibt.currentWeekNumber
+import org.interferolog.mibt.moneyCurrency
 import org.interferolog.mibt.ui.CaptureScreen
 import org.interferolog.mibt.ui.ClusterScreen
 import org.interferolog.mibt.ui.CrisisScreen
@@ -86,6 +87,7 @@ import org.interferolog.mibt.ui.GuideScreen
 import org.interferolog.mibt.ui.HolterScreen
 import org.interferolog.mibt.ui.IntakeScreen
 import org.interferolog.mibt.ui.LocalBottomClearance
+import org.interferolog.mibt.ui.LocalMoneyCurrency
 import org.interferolog.mibt.ui.MaintenanceScreen
 import org.interferolog.mibt.ui.MapScreen
 import org.interferolog.mibt.ui.PassportScreen
@@ -210,7 +212,10 @@ fun MibtNav(viewModel: JournalViewModel, openToken: Int, openTarget: String?) {
         },
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize()) {
-            CompositionLocalProvider(LocalBottomClearance provides bottomClearance) {
+            CompositionLocalProvider(
+                LocalBottomClearance provides bottomClearance,
+                LocalMoneyCurrency provides ui.moneyCurrency(),
+            ) {
                 NavDisplay(
                     backStack = backStack,
                     modifier = Modifier

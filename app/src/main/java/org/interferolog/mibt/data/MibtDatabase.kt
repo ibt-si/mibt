@@ -7,6 +7,7 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [
@@ -37,8 +38,9 @@ import androidx.room.RoomDatabase
         MaintenanceLogEntity::class,
         MarkerCheckEntity::class,
         ReminderPlanEntity::class,
+        AppSettingsEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 abstract class MibtDatabase : RoomDatabase() {
@@ -53,7 +55,16 @@ abstract class MibtDatabase : RoomDatabase() {
                     context.applicationContext,
                     MibtDatabase::class.java,
                     "mibt.db",
-                ).addMigrations(MIGRATION_1_2).build().also { instance = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                    .addCallback(object : Callback() {
+                        override fun onCreate(db: SupportSQLiteDatabase) {
+                            db.execSQL(
+                                "INSERT OR REPLACE INTO `app_settings` (`id`, `currencyCode`) " +
+                                    "VALUES (1, '${systemCurrencyCode()}')",
+                            )
+                        }
+                    })
+                    .build().also { instance = it }
             }
         }
     }

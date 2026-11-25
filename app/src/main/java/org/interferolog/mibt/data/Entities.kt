@@ -19,6 +19,7 @@ data class CycleEntity(
     val status: String,
     val fullCycleCompleted: Boolean,
     val vacation: Boolean = false,
+    @ColumnInfo(defaultValue = "'RUB'") val currency: String = "RUB",
 )
 
 @Entity(
@@ -394,4 +395,11 @@ data class ReminderPlanEntity(
     val minute1: Int = 9 * 60,
     val minute2: Int = 14 * 60,
     val minute3: Int = 20 * 60,
+)
+
+/** App-wide preference for the currency of newly created cycles. */
+@Entity(tableName = "app_settings")
+data class AppSettingsEntity(
+    @PrimaryKey val id: Int = 1,
+    val currencyCode: String,
 )

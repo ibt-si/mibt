@@ -32,7 +32,7 @@ Run from the repo root:
 
 - `content/JournalCanon.kt` — canonical book texts, week titles, forms and formulas. The book's Flight log is the source of truth: where app and log disagree, the log wins. Do not invent lines, examples or numbers.
 - `domain/` — pure logic (formulas, `RoutePlanner`, `Money`, enums). Money is integer kopecks (e.g. `60_000_00`). This is where unit tests concentrate.
-- `data/` — Room entities, DAO, `JournalRepository`, telemetry export. One `MibtDatabase` singleton via `MibtDatabase.get(context)` (`mibt.db`, v1, `exportSchema = false`); no migrations yet.
+- `data/` — Room entities, DAO, `JournalRepository`, telemetry export. One `MibtDatabase` singleton via `MibtDatabase.get(context)` (`mibt.db`, v3, `exportSchema = true`, schemas in `app/schemas/`). Each cycle stores its currency; `app_settings` holds the currency for new cycles. Migrations live in `data/Migrations.kt`.
 - `navigation/` — Navigation 3. Every `NavKey` route subclass must be registered in `MibtNav.kt`'s `navConfig` polymorphic serializer. `MainActivity` deep-link intent extra `"open"` accepts `"pause"` / `"pointc"`.
 - `JournalViewModel` (root) — `AndroidViewModel` exposing one `ui` StateFlow from the repository; all writes go through its coroutine-launching methods.
 - `reminder/` — silent Point C reminders and `BOOT_COMPLETED` receiver; `widget/` — Glance "3-second pause" widget. `MibtApplication` creates the `point-c` notification channel on API 26+ and reschedules reminders at startup.

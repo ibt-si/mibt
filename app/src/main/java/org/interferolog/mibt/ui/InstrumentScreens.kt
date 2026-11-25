@@ -55,6 +55,7 @@ import org.interferolog.mibt.data.HourLogEntity
 import org.interferolog.mibt.data.WorkItemEntity
 import org.interferolog.mibt.data.toDraft
 import org.interferolog.mibt.domain.Circle
+import org.interferolog.mibt.domain.CurrencyChoice
 import org.interferolog.mibt.domain.DebtInput
 import org.interferolog.mibt.domain.DebtStrategy
 import org.interferolog.mibt.domain.amortize
@@ -70,9 +71,9 @@ import org.interferolog.mibt.domain.SourceInput
 import org.interferolog.mibt.domain.WorkInput
 import org.interferolog.mibt.domain.formatHours
 import org.interferolog.mibt.domain.formatIndex
+import org.interferolog.mibt.domain.formatMoney
 import org.interferolog.mibt.domain.formatPerHour
 import org.interferolog.mibt.domain.formatPoints
-import org.interferolog.mibt.domain.formatRubles
 import org.interferolog.mibt.domain.formatYield
 import org.interferolog.mibt.domain.futureValue
 import org.interferolog.mibt.domain.index
@@ -80,7 +81,7 @@ import org.interferolog.mibt.domain.rate
 import org.interferolog.mibt.domain.sourceTotals
 import org.interferolog.mibt.domain.withDecision
 import org.interferolog.mibt.domain.workTotals
-import org.interferolog.mibt.domain.parseRubles
+import org.interferolog.mibt.domain.parseMoney
 import org.interferolog.mibt.domain.profileMonths
 import org.interferolog.mibt.domain.quadrant
 import org.interferolog.mibt.domain.quadrantLabel
@@ -115,6 +116,7 @@ fun SourcesScreen(viewModel: JournalViewModel) {
         NoCycleNotice()
         return
     }
+    val currency = moneyCurrency()
     var name by remember { mutableStateOf("") }
     var income by remember { mutableStateOf("") }
     var noise by remember { mutableStateOf("") }
@@ -146,8 +148,8 @@ fun SourcesScreen(viewModel: JournalViewModel) {
         SectionHeader(if (editingId == null) "Новый источник" else "Источник")
         SectionCard {
             Field("Источник", name, { name = it })
-            Field("Чистый доход", income, { income = it }, number = true, suffix = "₽")
-            Field("Компенсаторный Шум", noise, { noise = it }, number = true, suffix = "₽")
+            Field("Чистый доход", income, { income = it }, number = true, suffix = currency.symbol)
+            Field("Компенсаторный Шум", noise, { noise = it }, number = true, suffix = currency.symbol)
             Field("Часы по договору", contract, { contract = it }, number = true, suffix = "ч")
             Field("Часы трения", friction, { friction = it }, number = true, suffix = "ч")
             Field("Dᵢ, доля дохода", dShare, { dShare = it }, number = true, suffix = "%")
@@ -160,8 +162,8 @@ fun SourcesScreen(viewModel: JournalViewModel) {
                         id = editingId ?: 0,
                         cycleId = cycleId,
                         name = name.ifBlank { "Источник" },
-                        netIncomeKopecks = parseRubles(income) ?: 0,
-                        compensatoryNoiseKopecks = parseRubles(noise) ?: 0,
+                        netIncomeKopecks = parseMoney(income, currency) ?: 0,
+                        compensatoryNoiseKopecks = parseMoney(noise, currency) ?: 0,
                         contractHours = contract.toDoubleOrNull() ?: 0.0,
                         frictionHours = friction.toDoubleOrNull() ?: 0.0,
                         incomeShare = dShare.toDoubleOrNull() ?: 0.0,
@@ -180,15 +182,15 @@ fun SourcesScreen(viewModel: JournalViewModel) {
         EntryList(
             columns = blank.columns,
             entries = ui.sources.mapIndexed { index, source ->
-                EntryLine(source.id, sourceCells(index, source.toInput(), source.name, source.decision))
+                EntryLine(source.id, sourceCells(index, source.toInput(), source.name, source.decision, currency))
             },
             onDelete = viewModel::deleteSource,
             onEdit = { id ->
                 val source = ui.sources.firstOrNull { it.id == id } ?: return@EntryList
                 editingId = source.id
                 name = source.name
-                income = rublesField(source.netIncomeKopecks)
-                noise = rublesField(source.compensatoryNoiseKopecks)
+                income = moneyField(source.netIncomeKopecks, currency)
+                noise = moneyField(source.compensatoryNoiseKopecks, currency)
                 contract = numberField(source.contractHours)
                 friction = numberField(source.frictionHours)
                 dShare = numberField(source.incomeShare)
@@ -198,7 +200,7 @@ fun SourcesScreen(viewModel: JournalViewModel) {
             },
         )
         if (rows.isNotEmpty()) {
-            ColumnCard(blank.rowLabels.single(), blank.columns, sourceTotalCells(blank, rows))
+            ColumnCard(blank.rowLabels.single(), blank.columns, sourceTotalCells(blank, rows, currency))
         }
     }
 }
@@ -445,30 +447,40 @@ private fun IncomeSourceEntity.toInput() = SourceInput(
     frictionScore = frictionScore,
 )
 
-private fun sourceCells(index: Int, source: SourceInput, name: String, decision: String): List<String> {
+private fun sourceCells(
+    index: Int,
+    source: SourceInput,
+    name: String,
+    decision: String,
+    currency: CurrencyChoice,
+): List<String> {
     val zone = source.index()?.let { fiZoneLabel(fiZone(it)) } ?: "—"
     return listOf(
         (index + 1).toString(),
         name.ifBlank { "—" },
-        formatRubles(source.netIncomeKopecks),
+        formatMoney(source.netIncomeKopecks, currency),
         formatPoints(source.incomeShare),
         hoursAndShare(source.contractHours + source.frictionHours, source.hoursShare),
-        source.rate()?.let(::formatPerHour) ?: "—",
+        source.rate()?.let { formatPerHour(it, currency) } ?: "—",
         source.frictionScore.toString(),
         source.index()?.let(::formatIndex) ?: "—",
         withDecision(zone, decision),
     )
 }
 
-private fun sourceTotalCells(blank: BlankCanon, rows: List<SourceInput>): List<String> {
+private fun sourceTotalCells(
+    blank: BlankCanon,
+    rows: List<SourceInput>,
+    currency: CurrencyChoice,
+): List<String> {
     val total = sourceTotals(rows)
     return listOf(
         blank.totalLabels[0],
         "—",
-        formatRubles(total.netIncomeKopecks),
+        formatMoney(total.netIncomeKopecks, currency),
         printedShare(total.incomeShare, blank.totalLabels[1]),
         hoursAndShare(total.hours, total.hoursShare),
-        total.averageRateKopecks?.let { "${blank.totalLabels[2]} ${formatPerHour(it)}" }
+        total.averageRateKopecks?.let { "${blank.totalLabels[2]} ${formatPerHour(it, currency)}" }
             ?: "${blank.totalLabels[2]} —",
         "—",
         "${blank.totalLabels[3]} ${total.rowsAtLeastTwo}",
@@ -525,7 +537,8 @@ private fun markLabel(mark: String): String = when (mark) {
     else -> mark
 }
 
-private fun rublesField(kopecks: Long): String = formatRubles(kopecks).removeSuffix(" ₽")
+private fun moneyField(minor: Long, currency: CurrencyChoice): String =
+    formatMoney(minor, currency).removeSuffix(" ${currency.symbol}")
 
 private fun numberField(value: Double): String =
     if (value % 1.0 == 0.0) value.toLong().toString() else value.toString()
@@ -549,8 +562,9 @@ fun FamilyScreen(viewModel: JournalViewModel) {
         NoCycleNotice()
         return
     }
+    val currency = moneyCurrency()
     val saved = ui.family
-    var draft by remember(cycleId, saved) { mutableStateOf(saved?.toDraft() ?: FamilyDraft()) }
+    var draft by remember(cycleId, saved) { mutableStateOf(saved?.toDraft(currency) ?: FamilyDraft()) }
     var left by remember { mutableIntStateOf(0) }
     var purchase by remember { mutableStateOf("") }
 
@@ -598,28 +612,28 @@ fun FamilyScreen(viewModel: JournalViewModel) {
             subtitle = "Общая Опора и обязательства не урезаются ни в одном споре. Общий Инструмент сверх порога ждёт 24 часа. Целевой фонд меняется только через спокойный разговор. Личные доли — без отчётов.",
         )
         SectionCard {
-            Field("Доход 1", draft.income1, { draft = draft.copy(income1 = it) }, number = true, suffix = "₽")
-            Field("Доход 2", draft.income2, { draft = draft.copy(income2 = it) }, number = true, suffix = "₽")
-            Field("Фундамент Ф", draft.foundation, { draft = draft.copy(foundation = it) }, number = true, suffix = "₽")
-            Field("Целевой фонд", draft.targetFund, { draft = draft.copy(targetFund = it) }, number = true, suffix = "₽")
-            Field("Личная доля 1", draft.personal1, { draft = draft.copy(personal1 = it) }, number = true, suffix = "₽")
-            Field("Личная доля 2", draft.personal2, { draft = draft.copy(personal2 = it) }, number = true, suffix = "₽")
-            Field("Порог общей траты", draft.threshold, { draft = draft.copy(threshold = it) }, number = true, suffix = "₽")
-            val f = parseRubles(draft.foundation) ?: 0
-            val remainder = familyRemainder(parseRubles(draft.income1) ?: 0, parseRubles(draft.income2) ?: 0, f)
+            Field("Доход 1", draft.income1, { draft = draft.copy(income1 = it) }, number = true, suffix = currency.symbol)
+            Field("Доход 2", draft.income2, { draft = draft.copy(income2 = it) }, number = true, suffix = currency.symbol)
+            Field("Фундамент Ф", draft.foundation, { draft = draft.copy(foundation = it) }, number = true, suffix = currency.symbol)
+            Field("Целевой фонд", draft.targetFund, { draft = draft.copy(targetFund = it) }, number = true, suffix = currency.symbol)
+            Field("Личная доля 1", draft.personal1, { draft = draft.copy(personal1 = it) }, number = true, suffix = currency.symbol)
+            Field("Личная доля 2", draft.personal2, { draft = draft.copy(personal2 = it) }, number = true, suffix = currency.symbol)
+            Field("Порог общей траты", draft.threshold, { draft = draft.copy(threshold = it) }, number = true, suffix = currency.symbol)
+            val f = parseMoney(draft.foundation, currency) ?: 0
+            val remainder = familyRemainder(parseMoney(draft.income1, currency) ?: 0, parseMoney(draft.income2, currency) ?: 0, f)
             if (anyMoney) {
-                val sumCheck = f + (parseRubles(draft.targetFund) ?: 0) + (parseRubles(draft.personal1) ?: 0) + (parseRubles(draft.personal2) ?: 0)
+                val sumCheck = f + (parseMoney(draft.targetFund, currency) ?: 0) + (parseMoney(draft.personal1, currency) ?: 0) + (parseMoney(draft.personal2, currency) ?: 0)
                 MetricCard(
-                    value = formatRubles(remainder),
+                    value = formatMoney(remainder, currency),
                     caption = "Свободный остаток С",
-                    status = "Проверка: Ф + Ц + Л₁ + Л₂ = ${formatRubles(sumCheck)}",
+                    status = "Проверка: Ф + Ц + Л₁ + Л₂ = ${formatMoney(sumCheck, currency)}",
                     tone = if (remainder < 0) CardTone.Error else CardTone.Primary,
                 )
             } else {
                 MetaText("Свободный остаток С появится, когда будут вписаны свои суммы. Пример из главы в поля не подставлен.")
             }
             CommitButton("Сохранить контуры") {
-                viewModel.saveFamily(draft.toEntity(cycleId))
+                viewModel.saveFamily(draft.toEntity(cycleId, currency))
             }
         }
 
@@ -640,19 +654,19 @@ fun FamilyScreen(viewModel: JournalViewModel) {
 
         SectionHeader("Порог общей траты (24 часа)")
         SectionCard {
-            Field("Общая трата сверх порога", purchase, { purchase = it }, number = true, suffix = "₽")
+            Field("Общая трата сверх порога", purchase, { purchase = it }, number = true, suffix = currency.symbol)
             if (quarantine != null) {
                 QuietCard("Карантин 24 часа ещё идёт. Общая покупка сверх порога подождёт.", CardTone.Error)
             }
             TonalButton(
                 text = "Проверить порог",
                 modifier = Modifier.fillMaxWidth(),
-                enabled = parseRubles(purchase) != null,
+                enabled = parseMoney(purchase, currency) != null,
             ) {
-                val amount = parseRubles(purchase) ?: return@TonalButton
-                val limit = parseRubles(draft.threshold) ?: ui.family?.threshold ?: 0
+                val amount = parseMoney(purchase, currency) ?: return@TonalButton
+                val limit = parseMoney(draft.threshold, currency) ?: ui.family?.threshold ?: 0
                 if (amount > limit && quarantine == null) {
-                    viewModel.startQuarantine("H24", 24, "Общая трата ${formatRubles(amount)}")
+                    viewModel.startQuarantine("H24", 24, "Общая трата ${formatMoney(amount, currency)}")
                 }
             }
         }
@@ -667,8 +681,9 @@ fun RestScreen(viewModel: JournalViewModel) {
         NoCycleNotice()
         return
     }
+    val currency = moneyCurrency()
     val saved = ui.rest
-    var draft by remember(cycleId, saved) { mutableStateOf(saved?.toDraft() ?: RestDraft()) }
+    var draft by remember(cycleId, saved) { mutableStateOf(saved?.toDraft(currency) ?: RestDraft()) }
     var income by remember { mutableStateOf("") }
     var withdrawal by remember { mutableStateOf("") }
     var debtName by remember { mutableStateOf("") }
@@ -678,24 +693,24 @@ fun RestScreen(viewModel: JournalViewModel) {
     var debtExtra by remember { mutableStateOf("") }
 
     ScreenColumn {
-        val minimum = carryingMinimum(parseRubles(draft.support) ?: 0, parseRubles(draft.tool) ?: 0, parseRubles(draft.obligations) ?: 0)
-        val months = runwayMonths(parseRubles(draft.balance) ?: 0, minimum)
+        val minimum = carryingMinimum(parseMoney(draft.support, currency) ?: 0, parseMoney(draft.tool, currency) ?: 0, parseMoney(draft.obligations, currency) ?: 0)
+        val months = runwayMonths(parseMoney(draft.balance, currency) ?: 0, minimum)
         val target = profileMonths(draft.profile)
         val zone = months?.let { runwayZone(it, target) }
 
         MetricCard(
             value = months?.let { "%.1f мес.".format(it) } ?: "—",
-            caption = "Запас хода · Emin ${formatRubles(minimum)}",
+            caption = "Запас хода · Emin ${formatMoney(minimum, currency)}",
             status = zone?.let { runwayLabel(it, target) } ?: "Цель профиля: $target месяцев.",
             tone = zone?.let(::runwayTone) ?: CardTone.Surface,
         )
 
         SectionHeader("Масса покоя")
         SectionCard {
-            Field("Опора U₁", draft.support, { draft = draft.copy(support = it) }, number = true, suffix = "₽")
-            Field("Инструмент U₂", draft.tool, { draft = draft.copy(tool = it) }, number = true, suffix = "₽")
-            Field("Обязательства", draft.obligations, { draft = draft.copy(obligations = it) }, number = true, suffix = "₽")
-            Field("Масса покоя B", draft.balance, { draft = draft.copy(balance = it) }, number = true, suffix = "₽")
+            Field("Опора U₁", draft.support, { draft = draft.copy(support = it) }, number = true, suffix = currency.symbol)
+            Field("Инструмент U₂", draft.tool, { draft = draft.copy(tool = it) }, number = true, suffix = currency.symbol)
+            Field("Обязательства", draft.obligations, { draft = draft.copy(obligations = it) }, number = true, suffix = currency.symbol)
+            Field("Масса покоя B", draft.balance, { draft = draft.copy(balance = it) }, number = true, suffix = currency.symbol)
             Field(
                 label = "Первое сечение",
                 value = draft.firstCutPercent,
@@ -711,32 +726,32 @@ fun RestScreen(viewModel: JournalViewModel) {
             )
             MetaText("Цель профиля: $target месяцев.")
             CommitButton("Записать массу покоя") {
-                viewModel.saveRest(draft.toEntity(cycleId, saved))
+                viewModel.saveRest(draft.toEntity(cycleId, saved, currency))
             }
         }
 
         SectionHeader("Движение по счёту")
         SectionCard {
-            Field("Приход", income, { income = it }, number = true, suffix = "₽")
+            Field("Приход", income, { income = it }, number = true, suffix = currency.symbol)
             TonalButton(
                 text = "Первое сечение с этого прихода",
                 modifier = Modifier.fillMaxWidth(),
-                enabled = parseRubles(income) != null,
+                enabled = parseMoney(income, currency) != null,
             ) {
-                parseRubles(income)?.let {
+                parseMoney(income, currency)?.let {
                     viewModel.applyFirstCut(it)
                     income = ""
                 }
             }
-            Field("Изъятие", withdrawal, { withdrawal = it }, number = true, suffix = "₽")
+            Field("Изъятие", withdrawal, { withdrawal = it }, number = true, suffix = currency.symbol)
             OutlinedButton(
                 onClick = {
-                    parseRubles(withdrawal)?.let {
+                    parseMoney(withdrawal, currency)?.let {
                         viewModel.withdraw(it)
                         withdrawal = ""
                     }
                 },
-                enabled = parseRubles(withdrawal) != null,
+                enabled = parseMoney(withdrawal, currency) != null,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text("Изъятие из массы покоя")
@@ -758,7 +773,7 @@ fun RestScreen(viewModel: JournalViewModel) {
                         .clip(shape),
                     supportingContent = {
                         Text(
-                            "Остаток ${formatRubles(debt.balance)} · ${"%.1f".format(debt.ratePercent)}% · мин. ${formatRubles(debt.minPayment)}",
+                            "Остаток ${formatMoney(debt.balance, currency)} · ${"%.1f".format(debt.ratePercent)}% · мин. ${formatMoney(debt.minPayment, currency)}",
                         )
                     },
                     trailingContent = {
@@ -782,17 +797,17 @@ fun RestScreen(viewModel: JournalViewModel) {
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
                         MetaText("Мес. ${row.month} · ${row.focus}")
-                        Text(formatRubles(row.remaining), style = MaterialTheme.typography.bodyMedium)
+                        Text(formatMoney(row.remaining, currency), style = MaterialTheme.typography.bodyMedium)
                     }
                 }
             }
         }
         SectionCard {
             Field("Долг", debtName, { debtName = it })
-            Field("Остаток", debtBalance, { debtBalance = it }, number = true, suffix = "₽")
+            Field("Остаток", debtBalance, { debtBalance = it }, number = true, suffix = currency.symbol)
             Field("Ставка", debtRate, { debtRate = it }, number = true, suffix = "%")
-            Field("Минимальный платёж", debtMin, { debtMin = it }, number = true, suffix = "₽")
-            Field("Сверх минимума", debtExtra, { debtExtra = it }, number = true, suffix = "₽")
+            Field("Минимальный платёж", debtMin, { debtMin = it }, number = true, suffix = currency.symbol)
+            Field("Сверх минимума", debtExtra, { debtExtra = it }, number = true, suffix = currency.symbol)
             TonalButton(
                 text = "Добавить обязательство",
                 modifier = Modifier.fillMaxWidth(),
@@ -801,10 +816,10 @@ fun RestScreen(viewModel: JournalViewModel) {
                         DebtEntity(
                             cycleId = cycleId,
                             name = debtName.ifBlank { "Долг" },
-                            balance = parseRubles(debtBalance) ?: 0,
+                            balance = parseMoney(debtBalance, currency) ?: 0,
                             ratePercent = debtRate.toDoubleOrNull() ?: 0.0,
-                            minPayment = parseRubles(debtMin) ?: 0,
-                            extra = parseRubles(debtExtra) ?: 0,
+                            minPayment = parseMoney(debtMin, currency) ?: 0,
+                            extra = parseMoney(debtExtra, currency) ?: 0,
                         ),
                     )
                     debtName = ""
@@ -826,38 +841,39 @@ fun CrisisScreen(viewModel: JournalViewModel) {
         NoCycleNotice()
         return
     }
+    val currency = moneyCurrency()
     val saved = ui.crisis
-    var draft by remember(cycleId, saved) { mutableStateOf(saved?.toDraft() ?: CrisisDraft()) }
+    var draft by remember(cycleId, saved) { mutableStateOf(saved?.toDraft(currency) ?: CrisisDraft()) }
     var tranche by remember { mutableStateOf("") }
 
     val now = System.currentTimeMillis()
     val quarantine = ui.quarantines.firstOrNull { it.kind == "H72" && it.endsAt > now }
-    val emergencyValue = parseRubles(draft.emergencyMinimum) ?: 0
+    val emergencyValue = parseMoney(draft.emergencyMinimum, currency) ?: 0
     val profile = profileMonths(ui.rest?.profile ?: "HIRE")
-    val runway = runwayMonths(parseRubles(draft.accessible) ?: 0, emergencyValue)
+    val runway = runwayMonths(parseMoney(draft.accessible, currency) ?: 0, emergencyValue)
     val crisisZone = runway?.let { runwayZone(it, profile) }
     val trancheRemainder = weeklyTrancheRemainder(emergencyValue)
-    val trancheNote = if (trancheRemainder == 0L) "" else " Остаток ${formatRubles(trancheRemainder)} остаётся в запасе."
+    val trancheNote = if (trancheRemainder == 0L) "" else " Остаток ${formatMoney(trancheRemainder, currency)} остаётся в запасе."
 
     ScreenColumn {
         MetricCard(
             value = runway?.let { "%.0f дн.".format(it * 30) } ?: "—",
             caption = "Аварийный запас хода",
             status = (crisisZone?.let { "${runwayLabel(it, profile)} · " }.orEmpty()) +
-                "Недельный транш: ${formatRubles(weeklyTranche(emergencyValue))}.$trancheNote",
+                "Недельный транш: ${formatMoney(weeklyTranche(emergencyValue), currency)}.$trancheNote",
             tone = crisisZone?.let(::runwayTone) ?: CardTone.Surface,
         )
 
         SectionHeader("Карта кризиса")
         SectionCard {
-            Field("Масса покоя в доступе", draft.accessible, { draft = draft.copy(accessible = it) }, number = true, suffix = "₽")
-            Field("Штатный минимум", draft.staffMinimum, { draft = draft.copy(staffMinimum = it) }, number = true, suffix = "₽")
-            Field("Аварийный минимум", draft.emergencyMinimum, { draft = draft.copy(emergencyMinimum = it) }, number = true, suffix = "₽")
+            Field("Масса покоя в доступе", draft.accessible, { draft = draft.copy(accessible = it) }, number = true, suffix = currency.symbol)
+            Field("Штатный минимум", draft.staffMinimum, { draft = draft.copy(staffMinimum = it) }, number = true, suffix = currency.symbol)
+            Field("Аварийный минимум", draft.emergencyMinimum, { draft = draft.copy(emergencyMinimum = it) }, number = true, suffix = currency.symbol)
             Field("Список отсечения", draft.cutList, { draft = draft.copy(cutList = it) }, singleLine = false)
             Field("Кольцо опоры", draft.supportRing, { draft = draft.copy(supportRing = it) }, singleLine = false)
             Field("Три предложения рынку", draft.offers, { draft = draft.copy(offers = it) }, singleLine = false)
             CommitButton("Сохранить карту") {
-                viewModel.saveCrisis(draft.toEntity(cycleId))
+                viewModel.saveCrisis(draft.toEntity(cycleId, currency))
             }
         }
 
@@ -870,7 +886,7 @@ fun CrisisScreen(viewModel: JournalViewModel) {
                 onClick = {
                     val marked = draft.copy(drillDone = true)
                     draft = marked
-                    viewModel.saveCrisis(marked.toEntity(cycleId))
+                    viewModel.saveCrisis(marked.toEntity(cycleId, currency))
                 },
                 enabled = ui.crisis?.drillDone != true,
                 modifier = Modifier.fillMaxWidth(),
@@ -892,13 +908,13 @@ fun CrisisScreen(viewModel: JournalViewModel) {
 
         SectionHeader("Недельные транши")
         SectionCard {
-            Field("Недельный транш", tranche, { tranche = it }, number = true, suffix = "₽")
+            Field("Недельный транш", tranche, { tranche = it }, number = true, suffix = currency.symbol)
             TonalButton(
                 text = "Записать транш",
                 modifier = Modifier.fillMaxWidth(),
-                enabled = parseRubles(tranche) != null,
+                enabled = parseMoney(tranche, currency) != null,
             ) {
-                val amount = parseRubles(tranche) ?: return@TonalButton
+                val amount = parseMoney(tranche, currency) ?: return@TonalButton
                 viewModel.saveTranche(amount, runway ?: 0.0)
                 tranche = ""
             }
@@ -912,7 +928,7 @@ fun CrisisScreen(viewModel: JournalViewModel) {
                         .clip(shape),
                     supportingContent = { Text("Запас ${"%.1f".format(item.runwayMonths)} мес.") },
                     colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-                    content = { Text(formatRubles(item.amount), style = MaterialTheme.typography.titleMedium) },
+                    content = { Text(formatMoney(item.amount, currency), style = MaterialTheme.typography.titleMedium) },
                 )
             }
         }
@@ -1122,8 +1138,9 @@ fun PassportScreen(viewModel: JournalViewModel) {
         NoCycleNotice()
         return
     }
+    val currency = moneyCurrency()
     val saved = ui.passport
-    var draft by remember(cycleId, saved) { mutableStateOf(saved?.toDraft() ?: PassportDraft()) }
+    var draft by remember(cycleId, saved) { mutableStateOf(saved?.toDraft(currency) ?: PassportDraft()) }
     var coupon by remember { mutableStateOf("") }
 
     ScreenColumn {
@@ -1140,11 +1157,11 @@ fun PassportScreen(viewModel: JournalViewModel) {
 
         SectionHeader("Иллюстрация сложного процента")
         SectionCard {
-            Field("Счёт", draft.accountBalance, { draft = draft.copy(accountBalance = it) }, number = true, suffix = "₽")
-            Field("Взнос в месяц", draft.monthlyContribution, { draft = draft.copy(monthlyContribution = it) }, number = true, suffix = "₽")
+            Field("Счёт", draft.accountBalance, { draft = draft.copy(accountBalance = it) }, number = true, suffix = currency.symbol)
+            Field("Взнос в месяц", draft.monthlyContribution, { draft = draft.copy(monthlyContribution = it) }, number = true, suffix = currency.symbol)
             Field("Доходность в год", draft.annualRatePercent, { draft = draft.copy(annualRatePercent = it) }, number = true, suffix = "%")
             Field("Срок", draft.years, { draft = draft.copy(years = it) }, integer = true, suffix = "лет")
-            val paymentKop = parseRubles(draft.monthlyContribution)
+            val paymentKop = parseMoney(draft.monthlyContribution, currency)
             val rateValue = draft.annualRatePercent.toDoubleOrNull()
             val yearValue = draft.years.toIntOrNull()
             if (draft.monthlyContribution.isNotBlank() && draft.annualRatePercent.isNotBlank() && draft.years.isNotBlank() &&
@@ -1152,7 +1169,7 @@ fun PassportScreen(viewModel: JournalViewModel) {
             ) {
                 val value = futureValue(paymentKop, rateValue / 100.0, yearValue * 12)
                 MetricCard(
-                    value = formatRubles(value.toLong()),
+                    value = formatMoney(value.toLong(), currency),
                     caption = "Иллюстрация счёта к концу срока по введённым полям",
                     status = "Иллюстрация расчёта, не прогноз и не рекомендация.",
                     tone = CardTone.Primary,
@@ -1164,9 +1181,9 @@ fun PassportScreen(viewModel: JournalViewModel) {
 
         SectionHeader("Стресс-тест переборки")
         SectionCard {
-            val half = (parseRubles(draft.accountBalance) ?: 0) / 2
+            val half = (parseMoney(draft.accountBalance, currency) ?: 0) / 2
             if (draft.accountBalance.isNotBlank()) {
-                BodyText("Просадка 50% оставляет на счёте ${formatRubles(half)}. Опора, рабочие инструменты и сон при этом остаются отдельной Массой покоя.")
+                BodyText("Просадка 50% оставляет на счёте ${formatMoney(half, currency)}. Опора, рабочие инструменты и сон при этом остаются отдельной Массой покоя.")
             }
             SwitchRow("Переборка выдержала стресс-тест", draft.drawdownOk) { draft = draft.copy(drawdownOk = it) }
         }
@@ -1176,11 +1193,11 @@ fun PassportScreen(viewModel: JournalViewModel) {
             subtitle = "Доли реинвеста, Опоры и Кристалла журнал числами не задаёт. Впишите своё правило.",
         )
         SectionCard {
-            Field("Купонный приток", coupon, { coupon = it }, number = true, suffix = "₽")
+            Field("Купонный приток", coupon, { coupon = it }, number = true, suffix = currency.symbol)
             Field("Реинвест", draft.reinvestPercent, { draft = draft.copy(reinvestPercent = it) }, number = true, suffix = "%")
             Field("В Опору", draft.supportPercent, { draft = draft.copy(supportPercent = it) }, number = true, suffix = "%")
             Field("В Кристалл", draft.crystalPercent, { draft = draft.copy(crystalPercent = it) }, number = true, suffix = "%")
-            val couponKop = parseRubles(coupon)
+            val couponKop = parseMoney(coupon, currency)
             if (coupon.isNotBlank() && couponKop != null && listOf(draft.reinvestPercent, draft.supportPercent, draft.crystalPercent).all { it.isNotBlank() }) {
                 val split = splitCoupon(
                     couponKop,
@@ -1189,14 +1206,14 @@ fun PassportScreen(viewModel: JournalViewModel) {
                     draft.crystalPercent.toDoubleOrNull() ?: 0.0,
                 )
                 QuietCard(
-                    "Реинвест ${formatRubles(split.first)}, Опора ${formatRubles(split.second)}, Кристалл ${formatRubles(split.third)}.",
+                    "Реинвест ${formatMoney(split.first, currency)}, Опора ${formatMoney(split.second, currency)}, Кристалл ${formatMoney(split.third, currency)}.",
                     CardTone.Secondary,
                 )
             }
         }
 
         CommitButton("Сохранить паспорт") {
-            viewModel.savePassport(draft.toEntity(cycleId))
+            viewModel.savePassport(draft.toEntity(cycleId, currency))
         }
     }
 }

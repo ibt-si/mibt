@@ -44,10 +44,11 @@ import org.interferolog.mibt.domain.HolterMirror
 import org.interferolog.mibt.domain.HolterMovement
 import org.interferolog.mibt.domain.etaBand
 import org.interferolog.mibt.domain.etaBandLabel
+import org.interferolog.mibt.domain.CurrencyChoice
+import org.interferolog.mibt.domain.formatMoney
 import org.interferolog.mibt.domain.formatRatio
-import org.interferolog.mibt.domain.formatRubles
 import org.interferolog.mibt.domain.holterWeeks
-import org.interferolog.mibt.domain.parseRubles
+import org.interferolog.mibt.domain.parseMoney
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -60,6 +61,7 @@ fun CaptureScreen(viewModel: JournalViewModel) {
         NoCycleNotice()
         return
     }
+    val currency = moneyCurrency()
     val blank = BlankCanon.phaseDiary
     var amount by remember { mutableStateOf("") }
     var context by remember { mutableStateOf("") }
@@ -67,7 +69,7 @@ fun CaptureScreen(viewModel: JournalViewModel) {
     var fact by remember { mutableStateOf("") }
 
     fun submit(impulse: String) {
-        viewModel.saveDiary(parseRubles(amount), context, body, impulse, fact)
+        viewModel.saveDiary(parseMoney(amount, currency), context, body, impulse, fact)
         amount = ""
         context = ""
         body = ""
@@ -78,7 +80,7 @@ fun CaptureScreen(viewModel: JournalViewModel) {
         BlankHeader(blank)
         QuietCard("Время запишется в момент выбора. Минута тишины здесь не нужна.", CardTone.Secondary)
         SectionCard {
-            Field("Сумма", amount, { amount = it }, number = true, suffix = "₽")
+            Field("Сумма", amount, { amount = it }, number = true, suffix = currency.symbol)
             Field("Контекст", context, { context = it })
             Field("Телесный маркер", body, { body = it })
             Field("Факт без оценки", fact, { fact = it }, singleLine = false)
@@ -95,7 +97,7 @@ fun CaptureScreen(viewModel: JournalViewModel) {
         impulseShareLine(ui.diary.size, ui.diary.count { it.impulse == "EMPTY" })?.let { MetaText(it) }
         EntryList(
             columns = blank.columns,
-            entries = ui.diary.sortedByDescending { it.atMillis }.map { EntryLine(it.id, diaryCells(it)) },
+            entries = ui.diary.sortedByDescending { it.atMillis }.map { EntryLine(it.id, diaryCells(it, currency)) },
             onDelete = viewModel::deleteDiary,
         )
     }
@@ -108,6 +110,7 @@ fun PointCScreen(viewModel: JournalViewModel) {
         NoCycleNotice()
         return
     }
+    val currency = moneyCurrency()
     val blank = BlankCanon.pointC
     var situation by remember { mutableStateOf("") }
     var amount by remember { mutableStateOf("") }
@@ -120,7 +123,7 @@ fun PointCScreen(viewModel: JournalViewModel) {
         QuietCard(POINT_C, CardTone.Primary)
         SectionCard {
             Field("Ситуация", situation, { situation = it })
-            Field("Сумма", amount, { amount = it }, number = true, suffix = "₽")
+            Field("Сумма", amount, { amount = it }, number = true, suffix = currency.symbol)
             ChoiceGroup(
                 options = listOf("WELL" to "Колодец", "POINT_C" to "Точка C"),
                 selected = question,
@@ -136,7 +139,7 @@ fun PointCScreen(viewModel: JournalViewModel) {
             }
             Field("Что изменила пауза", effect, { effect = it }, singleLine = false)
             CommitButton("Записать") {
-                viewModel.saveWell(situation, parseRubles(amount), question, spasm, effect)
+                viewModel.saveWell(situation, parseMoney(amount, currency), question, spasm, effect)
                 situation = ""
                 amount = ""
                 effect = ""
@@ -147,7 +150,7 @@ fun PointCScreen(viewModel: JournalViewModel) {
         ExampleRows(blank.columns, blank.examples)
         EntryList(
             columns = blank.columns,
-            entries = ui.wells.sortedByDescending { it.atMillis }.map { EntryLine(it.id, wellCells(it)) },
+            entries = ui.wells.sortedByDescending { it.atMillis }.map { EntryLine(it.id, wellCells(it, currency)) },
             onDelete = viewModel::deleteWell,
         )
     }
@@ -181,6 +184,7 @@ fun HolterScreen(viewModel: JournalViewModel) {
             left -= 1
         }
     }
+    val currency = moneyCurrency()
     val missed = missedDays(ui)
     val ratio = currentEta(ui)
     val obz = ui.spends.filter { it.node == "OBZ" }.sumOf { it.amountKopecks }
@@ -204,7 +208,7 @@ fun HolterScreen(viewModel: JournalViewModel) {
             status = if (ratio == null) {
                 "Появится после первой траты вне обязательств."
             } else {
-                "${etaBandLabel(etaBand(ratio))}. Обязательства ${formatRubles(obz)} в формулу не входят."
+                "${etaBandLabel(etaBand(ratio))}. Обязательства ${formatMoney(obz, currency)} в формулу не входят."
             },
             tone = ratio?.let { etaTone(etaBand(it)) } ?: CardTone.Surface,
         )
@@ -261,7 +265,7 @@ fun HolterScreen(viewModel: JournalViewModel) {
                     colors = ListItemDefaults.colors(
                         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
                     ),
-                    content = { Text(formatRubles(bill.amountKopecks), style = MaterialTheme.typography.titleMedium) },
+                    content = { Text(formatMoney(bill.amountKopecks, currency), style = MaterialTheme.typography.titleMedium) },
                 )
             }
         }
@@ -274,14 +278,14 @@ fun HolterScreen(viewModel: JournalViewModel) {
                 }
             }
             week.days.forEach { day ->
-                ColumnCard(day.label, blank.columns, holterCells(day))
+                ColumnCard(day.label, blank.columns, holterCells(day, currency))
             }
-            ColumnCard(week.total.label, blank.columns, holterCells(week.total))
+            ColumnCard(week.total.label, blank.columns, holterCells(week.total, currency))
         }
         SectionHeader("Записи трат")
         EntryList(
             columns = listOf("Дата", "Узел", "Сумма", "Заметка"),
-            entries = ui.spends.sortedByDescending { it.atMillis }.map { EntryLine(it.id, spendCells(it)) },
+            entries = ui.spends.sortedByDescending { it.atMillis }.map { EntryLine(it.id, spendCells(it, currency)) },
             onDelete = viewModel::deleteSpend,
         )
     }
@@ -289,14 +293,15 @@ fun HolterScreen(viewModel: JournalViewModel) {
 
 @Composable
 private fun CleanSheetForm(viewModel: JournalViewModel) {
+    val currency = moneyCurrency()
     var amount by remember { mutableStateOf("") }
-    Field("Забытая разница", amount, { amount = it }, number = true, suffix = "₽")
+    Field("Забытая разница", amount, { amount = it }, number = true, suffix = currency.symbol)
     TonalButton(
         text = "Закрыть пропуск одной строкой",
-        enabled = parseRubles(amount) != null,
+        enabled = parseMoney(amount, currency) != null,
         modifier = Modifier.fillMaxWidth(),
     ) {
-        val value = parseRubles(amount) ?: return@TonalButton
+        val value = parseMoney(amount, currency) ?: return@TonalButton
         viewModel.saveSpend("U4", value, "Чистый лист", cleanSheet = true, canFundMirror = false)
         amount = ""
     }
@@ -304,6 +309,7 @@ private fun CleanSheetForm(viewModel: JournalViewModel) {
 
 @Composable
 private fun SpendForm(viewModel: JournalViewModel, cleanSheet: Boolean, title: String?) {
+    val currency = moneyCurrency()
     var amount by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
     var node by remember { mutableStateOf("U1") }
@@ -312,7 +318,7 @@ private fun SpendForm(viewModel: JournalViewModel, cleanSheet: Boolean, title: S
     if (title != null) {
         Text(title, style = MaterialTheme.typography.titleLargeEmphasized)
     }
-    Field("Сумма", amount, { amount = it }, number = true, suffix = "₽")
+    Field("Сумма", amount, { amount = it }, number = true, suffix = currency.symbol)
     Field("Заметка", note, { note = it })
     Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
         listOf(
@@ -337,9 +343,9 @@ private fun SpendForm(viewModel: JournalViewModel, cleanSheet: Boolean, title: S
     }
     CommitButton(
         text = "Записать",
-        enabled = parseRubles(amount) != null,
+        enabled = parseMoney(amount, currency) != null,
     ) {
-        val value = parseRubles(amount) ?: return@CommitButton
+        val value = parseMoney(amount, currency) ?: return@CommitButton
         if (node == "U4" && !cleanSheet) {
             askMirror = true
         } else {
@@ -352,7 +358,7 @@ private fun SpendForm(viewModel: JournalViewModel, cleanSheet: Boolean, title: S
         SectionCard(tone = CardTone.Tertiary) {
             BodyText("Трата в Шум открывает зеркальный счёт на ту же сумму в Рост. Если двойной цены сейчас нет, покупка не записывается.")
             CommitButton("Перевести столько же") {
-                val value = parseRubles(amount) ?: return@CommitButton
+                val value = parseMoney(amount, currency) ?: return@CommitButton
                 viewModel.saveSpend(node, value, note, false, canFundMirror = true)
                 askMirror = false
                 amount = ""
@@ -360,7 +366,7 @@ private fun SpendForm(viewModel: JournalViewModel, cleanSheet: Boolean, title: S
             }
             OutlinedButton(
                 onClick = {
-                    val value = parseRubles(amount) ?: return@OutlinedButton
+                    val value = parseMoney(amount, currency) ?: return@OutlinedButton
                     viewModel.saveSpend(node, value, note, false, canFundMirror = false)
                     askMirror = false
                 },
@@ -375,30 +381,35 @@ private fun SpendForm(viewModel: JournalViewModel, cleanSheet: Boolean, title: S
 private val entryTime: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")
 private val dayDate: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy")
 
-private fun holterCells(day: HolterDayFigures): List<String> = listOf(
+private fun holterCells(day: HolterDayFigures, currency: CurrencyChoice): List<String> = listOf(
     day.date?.format(dayDate) ?: "—",
-    incomeAndObligations(day.incomeKopecks, day.obligationsKopecks),
-    moneyOrDash(day.supportKopecks),
-    moneyOrDash(day.toolKopecks),
-    moneyOrDash(day.growthKopecks),
-    moneyOrDash(day.noiseKopecks),
-    moneyOrDash(day.doubleTariffKopecks),
+    incomeAndObligations(day.incomeKopecks, day.obligationsKopecks, currency),
+    moneyOrDash(day.supportKopecks, currency),
+    moneyOrDash(day.toolKopecks, currency),
+    moneyOrDash(day.growthKopecks, currency),
+    moneyOrDash(day.noiseKopecks, currency),
+    moneyOrDash(day.doubleTariffKopecks, currency),
     day.etaRatio?.let(::formatRatio) ?: "—",
 )
 
-private fun incomeAndObligations(income: Long, obligations: Long): String = when {
+private fun incomeAndObligations(
+    income: Long,
+    obligations: Long,
+    currency: CurrencyChoice,
+): String = when {
     income == 0L && obligations == 0L -> "—"
-    obligations == 0L -> formatRubles(income)
-    income == 0L -> "Обз ${formatRubles(obligations)}"
-    else -> "${formatRubles(income)}; Обз ${formatRubles(obligations)}"
+    obligations == 0L -> formatMoney(income, currency)
+    income == 0L -> "Обз ${formatMoney(obligations, currency)}"
+    else -> "${formatMoney(income, currency)}; Обз ${formatMoney(obligations, currency)}"
 }
 
-private fun moneyOrDash(kopecks: Long): String = if (kopecks == 0L) "—" else formatRubles(kopecks)
+private fun moneyOrDash(minor: Long, currency: CurrencyChoice): String =
+    if (minor == 0L) "—" else formatMoney(minor, currency)
 
-private fun spendCells(entry: SpendEntryEntity): List<String> = listOf(
+private fun spendCells(entry: SpendEntryEntity, currency: CurrencyChoice): List<String> = listOf(
     formatEntryTime(entry.atMillis),
     spendNodeLabel(entry.node),
-    formatRubles(entry.amountKopecks),
+    formatMoney(entry.amountKopecks, currency),
     entry.note.ifBlank { "—" },
 )
 
@@ -415,17 +426,17 @@ private fun spendNodeLabel(node: String): String = when (node) {
 private fun formatEntryTime(millis: Long): String =
     entryTime.format(Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()))
 
-private fun withAmount(text: String, amountKopecks: Long?): String {
-    val money = amountKopecks?.let(::formatRubles)
+private fun withAmount(text: String, amountKopecks: Long?, currency: CurrencyChoice): String {
+    val money = amountKopecks?.let { formatMoney(it, currency) }
     return listOf(text.trim(), money)
         .filter { !it.isNullOrBlank() }
         .joinToString(", ")
         .ifBlank { "—" }
 }
 
-private fun diaryCells(entry: PhaseDiaryEntryEntity): List<String> = listOf(
+private fun diaryCells(entry: PhaseDiaryEntryEntity, currency: CurrencyChoice): List<String> = listOf(
     formatEntryTime(entry.atMillis),
-    withAmount(entry.context, entry.amountKopecks),
+    withAmount(entry.context, entry.amountKopecks, currency),
     entry.bodyMarker.ifBlank { "—" },
     when (entry.impulse) {
         "EMPTY" -> "П"
@@ -435,9 +446,9 @@ private fun diaryCells(entry: PhaseDiaryEntryEntity): List<String> = listOf(
     entry.fact.ifBlank { "—" },
 )
 
-private fun wellCells(entry: WellEntryEntity): List<String> = listOf(
+private fun wellCells(entry: WellEntryEntity, currency: CurrencyChoice): List<String> = listOf(
     formatEntryTime(entry.atMillis),
-    withAmount(entry.situation, entry.amountKopecks),
+    withAmount(entry.situation, entry.amountKopecks, currency),
     when (entry.question) {
         "WELL" -> "Колодец"
         "POINT_C" -> "Точка C"

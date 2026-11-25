@@ -60,6 +60,7 @@ import org.interferolog.mibt.content.POINT_C
 import org.interferolog.mibt.content.WeekCanon
 import org.interferolog.mibt.currentWeekNumber
 import org.interferolog.mibt.data.JournalUi
+import org.interferolog.mibt.moneyCurrency
 import org.interferolog.mibt.data.WeekAttemptEntity
 import org.interferolog.mibt.domain.EtaBand
 import org.interferolog.mibt.domain.Letter
@@ -78,8 +79,8 @@ import org.interferolog.mibt.domain.familyRemainder
 import org.interferolog.mibt.domain.fiZone
 import org.interferolog.mibt.domain.fiZoneLabel
 import org.interferolog.mibt.domain.formatHours
+import org.interferolog.mibt.domain.formatMoney
 import org.interferolog.mibt.domain.formatRatio
-import org.interferolog.mibt.domain.formatRubles
 import org.interferolog.mibt.domain.futureValue
 import org.interferolog.mibt.domain.hourlyRate
 import org.interferolog.mibt.domain.profileMonths
@@ -757,6 +758,7 @@ private fun liveCalculation(ui: JournalUi, number: Int): String {
 
 private fun sourceLine(ui: JournalUi): String {
     if (ui.sources.isEmpty()) return "Источников пока нет. S и Fᵢ появятся после первой строки."
+    val currency = ui.moneyCurrency()
     val rates = ui.sources.map { source ->
         hourlyRate(source.netIncomeKopecks, source.compensatoryNoiseKopecks, source.contractHours, source.frictionHours)
     }
@@ -765,7 +767,7 @@ private fun sourceLine(ui: JournalUi): String {
     return ui.sources.mapIndexed { index, source ->
         val rate = rates[index]
         val resistance = if (rate != null && average != null) resistanceByRates(source.frictionScore, average, rate) else null
-        val rateText = rate?.let { "${formatRubles(it.toLong())}/ч" } ?: "—"
+        val rateText = rate?.let { "${formatMoney(it.toLong(), currency)}/ч" } ?: "—"
         val indexText = resistance?.let { "${"%.2f".format(it)}. ${fiZoneLabel(fiZone(it))}" } ?: "—"
         "${source.name}: S $rateText, Fᵢ $indexText"
     }.joinToString("\n")
@@ -784,28 +786,31 @@ private fun workLine(ui: JournalUi): String {
 
 private fun familyLine(ui: JournalUi): String {
     val plan = ui.family ?: return "Два контура ещё не сохранены."
+    val currency = ui.moneyCurrency()
     val left = familyRemainder(plan.income1, plan.income2, plan.foundation)
-    return "Фундамент ${formatRubles(plan.foundation)}, целевой фонд ${formatRubles(plan.targetFund)}, личные доли ${formatRubles(plan.personal1)} и ${formatRubles(plan.personal2)}. Остаток после фундамента ${formatRubles(left)}."
+    return "Фундамент ${formatMoney(plan.foundation, currency)}, целевой фонд ${formatMoney(plan.targetFund, currency)}, личные доли ${formatMoney(plan.personal1, currency)} и ${formatMoney(plan.personal2, currency)}. Остаток после фундамента ${formatMoney(left, currency)}."
 }
 
 private fun restLine(ui: JournalUi): String {
     val rest = ui.rest ?: return "Масса покоя ещё не записана."
+    val currency = ui.moneyCurrency()
     val minimum = carryingMinimum(rest.support, rest.tool, rest.obligations)
     val months = runwayMonths(rest.balance, minimum)
     val profile = profileMonths(rest.profile)
     val zone = months?.let { runwayLabel(runwayZone(it, profile), profile) } ?: "—"
     val runway = months?.let { "%.1f мес.".format(it) } ?: "—"
-    return "Emin ${formatRubles(minimum)}. M = B / Emin = $runway. $zone. Первое сечение ${"%.0f".format(rest.firstCutPercent)}%."
+    return "Emin ${formatMoney(minimum, currency)}. M = B / Emin = $runway. $zone. Первое сечение ${"%.0f".format(rest.firstCutPercent)}%."
 }
 
 private fun crisisLine(ui: JournalUi): String {
     val map = ui.crisis ?: return "Карта кризиса ещё не сохранена."
+    val currency = ui.moneyCurrency()
     val tranche = weeklyTranche(map.emergencyMinimum)
     val remainder = weeklyTrancheRemainder(map.emergencyMinimum)
-    val leftover = if (remainder == 0L) "" else " Остаток ${formatRubles(remainder)} остаётся в запасе."
+    val leftover = if (remainder == 0L) "" else " Остаток ${formatMoney(remainder, currency)} остаётся в запасе."
     val open = ui.quarantines.any { it.endsAt > System.currentTimeMillis() }
     val gate = if (open) "Карантин на резкие решения ещё идёт." else "Открытого карантина нет."
-    return "Аварийный минимум ${formatRubles(map.emergencyMinimum)}. Недельный транш ${formatRubles(tranche)}.$leftover $gate"
+    return "Аварийный минимум ${formatMoney(map.emergencyMinimum, currency)}. Недельный транш ${formatMoney(tranche, currency)}.$leftover $gate"
 }
 
 private fun fanLine(ui: JournalUi): String {
@@ -817,6 +822,7 @@ private fun fanLine(ui: JournalUi): String {
 
 private fun passportLine(ui: JournalUi): String {
     val passport = ui.passport ?: return "Паспорт ещё не сохранён."
+    val currency = ui.moneyCurrency()
     val half = passport.accountBalance / 2
     val illustrated = futureValue(passport.monthlyContribution, passport.annualRate, passport.years * 12)
     val split = splitCoupon(
@@ -825,7 +831,7 @@ private fun passportLine(ui: JournalUi): String {
         passport.supportPercent,
         passport.crystalPercent,
     )
-    return "Просадка 50% оставляет ${formatRubles(half)}. Иллюстрация счёта ${formatRubles(illustrated.toLong())}. Делёж взноса: реинвест ${formatRubles(split.first)}, Опора ${formatRubles(split.second)}, Кристалл ${formatRubles(split.third)}."
+    return "Просадка 50% оставляет ${formatMoney(half, currency)}. Иллюстрация счёта ${formatMoney(illustrated.toLong(), currency)}. Делёж взноса: реинвест ${formatMoney(split.first, currency)}, Опора ${formatMoney(split.second, currency)}, Кристалл ${formatMoney(split.third, currency)}."
 }
 
 private fun clusterLine(ui: JournalUi): String {
@@ -880,10 +886,11 @@ private fun markerBlocked(ui: JournalUi, number: Int): String = when (number) {
 
 internal fun etaLine(ui: JournalUi): String {
     val spends = ui.spends
+    val currency = ui.moneyCurrency()
     fun sum(node: String) = spends.filter { it.node == node }.sumOf { it.amountKopecks }
     val ratio = eta(sum("U1"), sum("U2"), sum("U3"), sum("U4"))
     return if (ratio == null) "η появится после первой траты вне обязательств."
-    else "η = ${formatRatio(ratio)}. ${etaBandLabel(etaBand(ratio))}. Обязательства ${formatRubles(sum("OBZ"))} в формулу не входят."
+    else "η = ${formatRatio(ratio)}. ${etaBandLabel(etaBand(ratio))}. Обязательства ${formatMoney(sum("OBZ"), currency)} в формулу не входят."
 }
 
 private fun filledEvenings(ui: JournalUi): Int {

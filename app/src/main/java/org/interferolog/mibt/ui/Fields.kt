@@ -75,8 +75,15 @@ import java.time.LocalDate
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
+import org.interferolog.mibt.domain.CurrencyChoice
 
 val LocalBottomClearance = compositionLocalOf { 16.dp }
+
+/** Currency of the cycle currently on screen; new cycles use the value from settings. */
+val LocalMoneyCurrency = compositionLocalOf<CurrencyChoice> { CurrencyChoice.RUB }
+
+@Composable
+fun moneyCurrency(): CurrencyChoice = LocalMoneyCurrency.current
 
 @Composable
 fun ScreenColumn(
