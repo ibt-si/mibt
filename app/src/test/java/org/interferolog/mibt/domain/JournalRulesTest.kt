@@ -157,7 +157,7 @@ class JournalRulesTest {
         assertTrue(JournalCanon.week(12).title.contains("то, что остаётся после нас"))
         assertFalse(JournalCanon.scripts.any { it.body.contains("не приведён") })
         assertTrue(JournalCanon.scripts.first { it.title == "Я пока не знаю" }.quoted)
-        assertTrue(JournalCanon.howToUse.first().startsWith("Журнал — рабочая тетрадь"))
+        assertTrue(JournalCanon.howToUse.first().startsWith("Журнал — рабочий инструмент"))
         assertEquals(7, JournalCanon.items.size)
     }
 
