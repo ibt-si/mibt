@@ -39,7 +39,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -399,13 +398,18 @@ fun MapScreen(viewModel: JournalViewModel, backStack: NavBackStack<NavKey>) {
 
 @Composable
 fun SilenceGateScreen(onDone: () -> Unit) {
-    var left by remember { mutableIntStateOf(60) }
+    val durationMs = 60_000L
+    var elapsedMs by remember { mutableLongStateOf(0L) }
+    // Sample a monotonic clock at frame cadence so the ring sweeps continuously,
+    // while the digits stay derived from the same elapsed time.
     LaunchedEffect(Unit) {
-        while (left > 0) {
-            delay(1000)
-            left -= 1
+        val startedAt = System.nanoTime()
+        while (elapsedMs < durationMs) {
+            elapsedMs = ((System.nanoTime() - startedAt) / 1_000_000L).coerceAtMost(durationMs)
+            if (elapsedMs < durationMs) delay(16)
         }
     }
+    val left = (60L - elapsedMs / 1_000L).toInt()
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -423,7 +427,7 @@ fun SilenceGateScreen(onDone: () -> Unit) {
         ) {
             Box(contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(
-                    progress = { (60 - left) / 60f },
+                    progress = { elapsedMs / durationMs.toFloat() },
                     modifier = Modifier.size(164.dp),
                     strokeWidth = 6.dp,
                     trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
@@ -453,7 +457,7 @@ fun SilenceGateScreen(onDone: () -> Unit) {
                 textAlign = TextAlign.Center,
             )
             CommitButton(
-                text = if (left == 0) "Открыть расчёт" else "Минута тишины ($left с)",
+                text = if (left == 0) "Открыть расчёт" else "Минута тишины",
                 enabled = left == 0,
                 onClick = onDone,
             )
