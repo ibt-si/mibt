@@ -5,6 +5,7 @@ package org.interferolog.mibt.ui
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,6 +36,7 @@ import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.PrimaryScrollableTabRow
+import androidx.compose.material3.ProgressIndicatorDefaults
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
@@ -189,6 +191,11 @@ fun IntakeScreen(viewModel: JournalViewModel, onRecorded: () -> Unit = {}) {
     val answers = answerCodes.map { code -> Letter.entries.firstOrNull { it.name == code } }
     val answered = (if (money != null) 1 else 0) + (if (clear != null) 1 else 0) + answers.count { it != null }
     val complete = money != null && clear != null && answers.all { it != null }
+    val animatedProgress by animateFloatAsState(
+        targetValue = answered / 9f,
+        animationSpec = ProgressIndicatorDefaults.ProgressAnimationSpec,
+        label = "IntakeProgress",
+    )
     val scheme = MaterialTheme.colorScheme
 
     ScreenColumn {
@@ -213,7 +220,7 @@ fun IntakeScreen(viewModel: JournalViewModel, onRecorded: () -> Unit = {}) {
                     MetaText("Время ${elapsed / 1000 / 60}:${"%02d".format((elapsed / 1000) % 60)}")
                 }
                 LinearProgressIndicator(
-                    progress = { answered / 9f },
+                    progress = { animatedProgress },
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
