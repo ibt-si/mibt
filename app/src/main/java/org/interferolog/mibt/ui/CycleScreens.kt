@@ -3,6 +3,8 @@
 
 package org.interferolog.mibt.ui
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,6 +50,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -126,7 +129,13 @@ import java.time.ZoneId
 @Composable
 fun GuideScreen(onStartTest: (() -> Unit)?) {
     val lines = JournalCanon.howToUse
+    val context = LocalContext.current
     ScreenColumn {
+        QuietCard("Основано на книге «Физика денег по ТИС», автор Вадим Н. Черашев", CardTone.Primary)
+        CommitButton("Заказать (interferolog@gmail.com)") {
+            val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:interferolog@gmail.com"))
+            context.startActivity(Intent.createChooser(intent, "Заказать"))
+        }
         if (lines.isNotEmpty()) BodyText(lines.first())
         if (lines.size >= 6) {
             SectionCard {
