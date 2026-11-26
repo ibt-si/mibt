@@ -43,7 +43,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.IconToggleButton
-import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -54,11 +53,11 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.TwoRowsTopAppBar
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -69,9 +68,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation3.runtime.NavKey
@@ -190,11 +193,18 @@ fun MibtNav(viewModel: JournalViewModel, openToken: Int, openTarget: String?) {
     val subtitle = screenSubtitle(top, week, !hasCycle, title)
     val bottomClearance = if (showFloatingToolbar || showStandaloneFab) 104.dp else 16.dp
 
-    // The collapsed row is only 64.dp and its title style is sized for a single line, so a
-    // two-line title there crushes the subtitle against the tabs. Material 3's own collapsed
-    // title is one line with ellipsis; keep the full two-line title for the expanded row only.
-    val titleExpanded by remember {
-        derivedStateOf { topBarScrollBehavior.state.collapsedFraction < 0.5f }
+    // TwoRowsTopAppBar gives each row its own static title, so the collapsed row can stay
+    // single-line (Material's TitleLarge in a 64.dp bar) without reflowing during a swipe.
+    // It doesn't add the large bar's title bottom padding, so derive that gap from the same
+    // token heights and typography the large flexible bar uses.
+    val expandedTitleGap = with(LocalDensity.current) {
+        fun TextStyle.lineHeightOrFontSize(): Dp =
+            if (lineHeight != TextUnit.Unspecified) lineHeight.toDp() else fontSize.toDp()
+        (TopAppBarDefaults.LargeFlexibleAppBarWithSubtitleExpandedHeight -
+            TopAppBarDefaults.LargeAppBarCollapsedHeight -
+            MaterialTheme.typography.displaySmall.lineHeightOrFontSize() -
+            MaterialTheme.typography.titleMedium.lineHeightOrFontSize())
+            .coerceAtLeast(0.dp)
     }
 
     Scaffold(
@@ -214,15 +224,34 @@ fun MibtNav(viewModel: JournalViewModel, openToken: Int, openTarget: String?) {
             )
         },
         topBar = {
-            LargeFlexibleTopAppBar(
-                title = {
+            TwoRowsTopAppBar(
+                title = { expanded ->
                     Text(
                         title,
-                        maxLines = if (titleExpanded) 2 else 1,
+                        style = if (expanded) {
+                            MaterialTheme.typography.displaySmall
+                        } else {
+                            MaterialTheme.typography.titleLarge
+                        },
+                        maxLines = if (expanded) 2 else 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                 },
-                subtitle = { Text(subtitle, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                subtitle = { expanded ->
+                    Text(
+                        subtitle,
+                        style = if (expanded) {
+                            MaterialTheme.typography.titleMedium
+                        } else {
+                            MaterialTheme.typography.labelMedium
+                        },
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = if (expanded) Modifier.padding(bottom = expandedTitleGap) else Modifier,
+                    )
+                },
+                collapsedHeight = TopAppBarDefaults.LargeAppBarCollapsedHeight,
+                expandedHeight = TopAppBarDefaults.LargeFlexibleAppBarWithSubtitleExpandedHeight,
                 scrollBehavior = topBarScrollBehavior,
                 navigationIcon = {
                     if (!isTopLevel && top != null) {
