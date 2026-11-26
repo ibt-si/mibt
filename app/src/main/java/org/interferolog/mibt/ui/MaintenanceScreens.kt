@@ -290,7 +290,7 @@ fun ReminderEditor(viewModel: JournalViewModel, showHeader: Boolean = true) {
     if (showHeader) {
         SectionTitle("Три бесшумных напоминания")
     }
-    MetaText("По сигналу — вес в стопах, выдох и вопрос Точки C. Канал тихий, без значка вины.")
+    MetaText("По сигналу — вес в стопах, выдох и вопрос Точки C.")
     SwitchRow("Напоминания включены", enabled) { on ->
         if (!on) {
             enabled = false
