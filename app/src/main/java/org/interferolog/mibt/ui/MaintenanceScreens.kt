@@ -6,13 +6,24 @@ package org.interferolog.mibt.ui
 import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -24,9 +35,13 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation3.runtime.NavBackStack
@@ -46,6 +61,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 private val dateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy")
+private const val MAINTENANCE_HISTORY_LIMIT = 10
 
 private fun formatDate(millis: Long): String =
     Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDate().format(dateFormatter)
@@ -54,8 +70,10 @@ private fun formatDate(millis: Long): String =
 fun MaintenanceScreen(viewModel: JournalViewModel, backStack: NavBackStack<NavKey>) {
     val ui by viewModel.ui.collectAsStateWithLifecycle()
     var note by remember { mutableStateOf("") }
+    var expandedRhythm by remember { mutableStateOf<String?>(null) }
     val anchor = ui.cycle?.completedAt ?: ui.cycle?.startedAt ?: System.currentTimeMillis()
     val scheme = MaterialTheme.colorScheme
+    val motionScheme = MaterialTheme.motionScheme
 
     ScreenColumn {
         SectionHeader("Четыре ритма")
@@ -63,27 +81,84 @@ fun MaintenanceScreen(viewModel: JournalViewModel, backStack: NavBackStack<NavKe
         SegmentedGroup(count = JournalCanon.rhythms.size) { index, shape ->
             val (rhythm, label) = JournalCanon.rhythms[index]
             val last = ui.maintenance.filter { it.rhythm == rhythm }.maxByOrNull { it.atMillis }
-            ListItem(
+            val expanded = expandedRhythm == rhythm
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(shape),
-                supportingContent = {
-                    Text(
-                        if (last == null) "Записей пока нет" else "Последняя отметка: ${formatDate(last.atMillis)}",
-                    )
-                },
-                trailingContent = {
-                    TonalButton(
-                        text = "Отметить",
-                        enabled = ui.cycle != null,
+                    .clip(shape)
+                    .background(scheme.surfaceContainerLow),
+            ) {
+                ListItem(
+                    modifier = Modifier.fillMaxWidth(),
+                    supportingContent = {
+                        Text(
+                            if (last == null) "Записей пока нет"
+                            else buildString {
+                                append("Последняя отметка: ${formatDate(last.atMillis)}")
+                                if (last.note.isNotBlank()) append("\n${last.note}")
+                            },
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    },
+                    trailingContent = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            val iconRotation by animateFloatAsState(
+                                targetValue = if (expanded) 180f else 0f,
+                                animationSpec = motionScheme.defaultEffectsSpec<Float>(),
+                                label = "rhythm-history-chevron",
+                            )
+                            IconButton(onClick = { expandedRhythm = if (expanded) null else rhythm }) {
+                                Icon(
+                                    imageVector = Icons.Filled.ExpandMore,
+                                    contentDescription = if (expanded) "Свернуть историю" else "История отметок",
+                                    modifier = Modifier.graphicsLayer { rotationZ = iconRotation },
+                                )
+                            }
+                            TonalButton(
+                                text = "Отметить",
+                                enabled = ui.cycle != null,
+                            ) {
+                                viewModel.logMaintenance(rhythm, note)
+                            }
+                        }
+                    },
+                    colors = ListItemDefaults.colors(containerColor = scheme.surfaceContainerLow),
+                    content = { Text(label, style = MaterialTheme.typography.bodyMedium) },
+                )
+                AnimatedVisibility(
+                    visible = expanded,
+                    enter = expandVertically(animationSpec = motionScheme.defaultSpatialSpec<IntSize>()) +
+                        fadeIn(animationSpec = motionScheme.defaultEffectsSpec<Float>()),
+                    exit = shrinkVertically(animationSpec = motionScheme.defaultSpatialSpec<IntSize>()) +
+                        fadeOut(animationSpec = motionScheme.defaultEffectsSpec<Float>()),
+                ) {
+                    val history = ui.maintenance.filter { it.rhythm == rhythm }
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        viewModel.logMaintenance(rhythm, note)
-                        note = ""
+                        if (history.isEmpty()) {
+                            MetaText("Записей пока нет.")
+                        } else {
+                            history.take(MAINTENANCE_HISTORY_LIMIT).forEach { entry ->
+                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    MetaText(formatDate(entry.atMillis))
+                                    Text(
+                                        entry.note.ifBlank { "Без заметки" },
+                                        style = MaterialTheme.typography.bodyMedium,
+                                    )
+                                }
+                            }
+                            if (history.size > MAINTENANCE_HISTORY_LIMIT) {
+                                MetaText("Показаны последние $MAINTENANCE_HISTORY_LIMIT отметок.")
+                            }
+                        }
                     }
-                },
-                colors = ListItemDefaults.colors(containerColor = scheme.surfaceContainerLow),
-                content = { Text(label, style = MaterialTheme.typography.bodyMedium) },
-            )
+                }
+            }
         }
 
         SectionHeader("Пять маркеров")
