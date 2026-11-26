@@ -3,13 +3,17 @@
 
 package org.interferolog.mibt.reminder
 
+import android.Manifest
 import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -19,14 +23,26 @@ import org.interferolog.mibt.content.POINT_C
 import org.interferolog.mibt.data.MibtDatabase
 import java.time.ZonedDateTime
 
+/** POST_NOTIFICATIONS is only a runtime permission from Android 13 onwards. */
+fun hasNotificationPermission(context: Context): Boolean =
+    Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+        ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.POST_NOTIFICATIONS,
+        ) == PackageManager.PERMISSION_GRANTED
+
 class PointReminderReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val minute = intent.getIntExtra(EXTRA_MINUTE, -1)
         val pending = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                show(context)
-                if (minute >= 0) ReminderScheduler.scheduleMinute(context, minute)
+                // A plan disabled after the alarm was scheduled must not notify,
+                // and its alarm is left to expire instead of rescheduling itself.
+                if (MibtDatabase.get(context).journal().reminder()?.enabled == true) {
+                    show(context)
+                    if (minute >= 0) ReminderScheduler.scheduleMinute(context, minute)
+                }
             } finally {
                 pending.finish()
             }
@@ -54,7 +70,12 @@ class PointReminderReceiver : BroadcastReceiver() {
                 .setAutoCancel(true)
                 .setContentIntent(open)
                 .build()
-            NotificationManagerCompat.from(context).notify(MINUTE_NOTIFICATION, notification)
+            if (!hasNotificationPermission(context)) return
+            try {
+                NotificationManagerCompat.from(context).notify(MINUTE_NOTIFICATION, notification)
+            } catch (_: SecurityException) {
+                // The permission may have been revoked in Settings after the check.
+            }
         }
 
         private const val MINUTE_NOTIFICATION = 42
@@ -77,11 +98,12 @@ class BootReceiver : BroadcastReceiver() {
 
 object ReminderScheduler {
     fun reschedule(context: Context) {
+        // Reminders are off until the user turns them on and saves a plan.
         val plan = kotlinx.coroutines.runBlocking { MibtDatabase.get(context).journal().reminder() }
-        if (plan?.enabled == false) return
-        val minutes = plan?.let { listOf(it.minute1, it.minute2, it.minute3) }
-            ?: listOf(9 * 60, 14 * 60, 20 * 60)
-        minutes.distinct().forEach { scheduleMinute(context, it) }
+        if (plan?.enabled != true) return
+        listOf(plan.minute1, plan.minute2, plan.minute3).distinct().forEach {
+            scheduleMinute(context, it)
+        }
     }
 
     fun scheduleMinute(context: Context, minuteOfDay: Int) {

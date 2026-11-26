@@ -4,7 +4,6 @@
 package org.interferolog.mibt.ui
 
 import android.Manifest
-import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -27,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation3.runtime.NavBackStack
@@ -39,6 +39,7 @@ import org.interferolog.mibt.navigation.ExportRoute
 import org.interferolog.mibt.navigation.IntakeRoute
 import org.interferolog.mibt.navigation.WeekRoute
 import org.interferolog.mibt.navigation.reveal
+import org.interferolog.mibt.reminder.hasNotificationPermission
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -202,22 +203,32 @@ fun ExportScreen(viewModel: JournalViewModel) {
 fun ReminderEditor(viewModel: JournalViewModel, showHeader: Boolean = true) {
     val ui by viewModel.ui.collectAsStateWithLifecycle()
     val reminders = ui.reminders
-    var enabled by remember(reminders) { mutableStateOf(reminders?.enabled ?: true) }
+    val context = LocalContext.current
+    var enabled by remember(reminders) { mutableStateOf(reminders?.enabled ?: false) }
     var first by remember(reminders) { mutableIntStateOf(reminders?.minute1 ?: 9 * 60) }
     var second by remember(reminders) { mutableIntStateOf(reminders?.minute2 ?: 14 * 60) }
     var third by remember(reminders) { mutableIntStateOf(reminders?.minute3 ?: 20 * 60) }
-    val notifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    val notifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) enabled = true
+    }
 
     if (showHeader) {
         SectionTitle("Три бесшумных напоминания")
     }
     MetaText("По сигналу — вес в стопах, выдох и вопрос Точки C. Канал тихий, без значка вины.")
-    SwitchRow("Напоминания включены", enabled) { enabled = it }
-    TimePickerField("Первое напоминание", first) { first = it }
-    TimePickerField("Второе напоминание", second) { second = it }
-    TimePickerField("Третье напоминание", third) { third = it }
-    TonalButton("Сохранить напоминания", modifier = Modifier.fillMaxWidth()) {
-        if (Build.VERSION.SDK_INT >= 33) notifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+    SwitchRow("Напоминания включены", enabled) { on ->
+        if (!on) {
+            enabled = false
+        } else if (!hasNotificationPermission(context)) {
+            notifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            enabled = true
+        }
+    }
+    TimePickerField("Первое напоминание", first, enabled = enabled) { first = it }
+    TimePickerField("Второе напоминание", second, enabled = enabled) { second = it }
+    TimePickerField("Третье напоминание", third, enabled = enabled) { third = it }
+    TonalButton("Сохранить напоминания", enabled = enabled, modifier = Modifier.fillMaxWidth()) {
         viewModel.saveReminders(
             ReminderPlanEntity(
                 enabled = enabled,

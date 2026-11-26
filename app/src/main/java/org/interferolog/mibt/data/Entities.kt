@@ -391,7 +391,7 @@ data class MarkerCheckEntity(
 @Entity(tableName = "reminder_plans")
 data class ReminderPlanEntity(
     @PrimaryKey val id: Int = 1,
-    val enabled: Boolean = true,
+    val enabled: Boolean = false,
     val minute1: Int = 9 * 60,
     val minute2: Int = 14 * 60,
     val minute3: Int = 20 * 60,

@@ -44,6 +44,7 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -506,12 +507,15 @@ fun UnsettableScaleSelector(
 fun TimePickerField(
     label: String,
     minuteOfDay: Int,
+    enabled: Boolean = true,
     onPick: (Int) -> Unit,
 ) {
     var open by remember { mutableStateOf(false) }
     val formatted = "%02d:%02d".format(minuteOfDay / 60, minuteOfDay % 60)
+    val disabledContentColor = ButtonDefaults.buttonColors().disabledContentColor
     Surface(
         onClick = { open = true },
+        enabled = enabled,
         shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceContainer,
         modifier = Modifier.fillMaxWidth(),
@@ -524,7 +528,11 @@ fun TimePickerField(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(label, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                label,
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (enabled) LocalContentColor.current else disabledContentColor,
+            )
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -532,12 +540,12 @@ fun TimePickerField(
                 Text(
                     formatted,
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = if (enabled) MaterialTheme.colorScheme.primary else disabledContentColor,
                 )
                 Icon(
                     Icons.Outlined.Schedule,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant else disabledContentColor,
                 )
             }
         }
