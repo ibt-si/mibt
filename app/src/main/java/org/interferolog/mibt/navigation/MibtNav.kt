@@ -3,7 +3,18 @@
 
 package org.interferolog.mibt.navigation
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.AnimationState
+import androidx.compose.animation.core.animateTo
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -80,6 +91,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
+import androidx.navigation3.scene.Scene
 import androidx.navigation3.ui.NavDisplay
 import androidx.savedstate.serialization.SavedStateConfiguration
 import kotlinx.serialization.modules.SerializersModule
@@ -115,6 +127,8 @@ import org.interferolog.mibt.ui.SilenceGateScreen
 import org.interferolog.mibt.ui.SourcesScreen
 import org.interferolog.mibt.ui.WeekScreen
 import org.interferolog.mibt.ui.WorkScreen
+
+private val topLevelRoutes: Set<NavKey> = setOf(HomeRoute, MapRoute, ScriptsRoute, MaintenanceRoute)
 
 private val navConfig = SavedStateConfiguration {
     serializersModule = SerializersModule {
@@ -154,6 +168,7 @@ fun MibtNav(viewModel: JournalViewModel, openToken: Int, openTarget: String?) {
     val notice by viewModel.notice.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     var captureSheet by remember { mutableStateOf(false) }
+    val motionScheme = MaterialTheme.motionScheme
 
     val topBarScrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val toolbarScrollBehavior = FloatingToolbarDefaults.exitAlwaysScrollBehavior(
@@ -185,7 +200,10 @@ fun MibtNav(viewModel: JournalViewModel, openToken: Int, openTarget: String?) {
     }
     LaunchedEffect(top) {
         captureSheet = false
-        topBarScrollBehavior.state.heightOffset = 0f
+        AnimationState(initialValue = topBarScrollBehavior.state.heightOffset).animateTo(
+            targetValue = 0f,
+            animationSpec = motionScheme.defaultSpatialSpec(),
+        ) { topBarScrollBehavior.state.heightOffset = value }
         toolbarScrollBehavior.state.offset = 0f
     }
 
@@ -226,42 +244,82 @@ fun MibtNav(viewModel: JournalViewModel, openToken: Int, openTarget: String?) {
         topBar = {
             TwoRowsTopAppBar(
                 title = { expanded ->
-                    Text(
-                        title,
-                        style = if (expanded) {
-                            MaterialTheme.typography.displaySmall
-                        } else {
-                            MaterialTheme.typography.titleLarge
+                    AnimatedContent(
+                        targetState = title,
+                        transitionSpec = {
+                            ContentTransform(
+                                fadeIn(animationSpec = motionScheme.defaultEffectsSpec()),
+                                fadeOut(animationSpec = motionScheme.defaultEffectsSpec()),
+                            ).using(
+                                SizeTransform(clip = false) { _, _ -> motionScheme.defaultSpatialSpec() },
+                            )
                         },
-                        maxLines = if (expanded) 2 else 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                        label = "topBarTitle",
+                    ) { value ->
+                        Text(
+                            value,
+                            style = if (expanded) {
+                                MaterialTheme.typography.displaySmall
+                            } else {
+                                MaterialTheme.typography.titleLarge
+                            },
+                            maxLines = if (expanded) 2 else 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 },
                 subtitle = { expanded ->
-                    Text(
-                        subtitle,
-                        style = if (expanded) {
-                            MaterialTheme.typography.titleMedium
-                        } else {
-                            MaterialTheme.typography.labelMedium
+                    AnimatedContent(
+                        targetState = subtitle,
+                        transitionSpec = {
+                            ContentTransform(
+                                fadeIn(animationSpec = motionScheme.defaultEffectsSpec()),
+                                fadeOut(animationSpec = motionScheme.defaultEffectsSpec()),
+                            ).using(
+                                SizeTransform(clip = false) { _, _ -> motionScheme.defaultSpatialSpec() },
+                            )
                         },
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = if (expanded) Modifier.padding(bottom = expandedTitleGap) else Modifier,
-                    )
+                        label = "topBarSubtitle",
+                    ) { value ->
+                        Text(
+                            value,
+                            style = if (expanded) {
+                                MaterialTheme.typography.titleMedium
+                            } else {
+                                MaterialTheme.typography.labelMedium
+                            },
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = if (expanded) Modifier.padding(bottom = expandedTitleGap) else Modifier,
+                        )
+                    }
                 },
                 collapsedHeight = TopAppBarDefaults.LargeAppBarCollapsedHeight,
                 expandedHeight = TopAppBarDefaults.LargeFlexibleAppBarWithSubtitleExpandedHeight,
                 scrollBehavior = topBarScrollBehavior,
                 navigationIcon = {
-                    if (!isTopLevel && top != null) {
+                    AnimatedVisibility(
+                        visible = !isTopLevel && top != null,
+                        enter = fadeIn(animationSpec = motionScheme.defaultEffectsSpec()) +
+                            scaleIn(initialScale = 0.8f, animationSpec = motionScheme.defaultSpatialSpec()),
+                        exit = fadeOut(animationSpec = motionScheme.defaultEffectsSpec()) +
+                            scaleOut(targetScale = 0.8f, animationSpec = motionScheme.defaultSpatialSpec()),
+                        label = "topBarBackIcon",
+                    ) {
                         IconButton(onClick = { backStack.removeLastOrNull() }) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
                         }
                     }
                 },
                 actions = {
-                    if (showGuideAction) {
+                    AnimatedVisibility(
+                        visible = showGuideAction,
+                        enter = fadeIn(animationSpec = motionScheme.defaultEffectsSpec()) +
+                            scaleIn(initialScale = 0.8f, animationSpec = motionScheme.defaultSpatialSpec()),
+                        exit = fadeOut(animationSpec = motionScheme.defaultEffectsSpec()) +
+                            scaleOut(targetScale = 0.8f, animationSpec = motionScheme.defaultSpatialSpec()),
+                        label = "topBarGuideAction",
+                    ) {
                         IconButton(onClick = { backStack.reveal(GuideRoute) }) {
                             Icon(Icons.Outlined.Info, contentDescription = "Как пользоваться")
                         }
@@ -275,12 +333,48 @@ fun MibtNav(viewModel: JournalViewModel, openToken: Int, openTarget: String?) {
                 LocalBottomClearance provides bottomClearance,
                 LocalMoneyCurrency provides ui.moneyCurrency(),
             ) {
+                val screenTransition: AnimatedContentTransitionScope<Scene<NavKey>>.(pop: Boolean) -> ContentTransform =
+                    { pop ->
+                        val effects = motionScheme.defaultEffectsSpec<Float>()
+                        if (backStack.lastOrNull() in topLevelRoutes) {
+                            ContentTransform(
+                                fadeIn(animationSpec = effects),
+                                fadeOut(animationSpec = effects),
+                            )
+                        } else {
+                            val enterTowards = if (pop) {
+                                AnimatedContentTransitionScope.SlideDirection.Start
+                            } else {
+                                AnimatedContentTransitionScope.SlideDirection.End
+                            }
+                            val exitTowards = if (pop) {
+                                AnimatedContentTransitionScope.SlideDirection.End
+                            } else {
+                                AnimatedContentTransitionScope.SlideDirection.Start
+                            }
+                            ContentTransform(
+                                slideIntoContainer(enterTowards, motionScheme.defaultSpatialSpec()) +
+                                    fadeIn(animationSpec = effects),
+                                slideOutOfContainer(exitTowards, motionScheme.defaultSpatialSpec()) +
+                                    fadeOut(animationSpec = effects),
+                            )
+                        }
+                    }
                 NavDisplay(
                     backStack = backStack,
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(padding),
                     onBack = { backStack.removeLastOrNull() },
+                    transitionSpec = { screenTransition(false) },
+                    popTransitionSpec = { screenTransition(true) },
+                    predictivePopTransitionSpec = { _ ->
+                        val effects = motionScheme.defaultEffectsSpec<Float>()
+                        ContentTransform(
+                            fadeIn(animationSpec = effects),
+                            fadeOut(animationSpec = effects),
+                        )
+                    },
                     entryProvider = entryProvider {
                         entry<HomeRoute> {
                             when {
